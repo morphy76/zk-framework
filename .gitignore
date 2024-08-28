@@ -1,0 +1,51 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+deploy.env
+/g-fe-server
+/g-be-service
+/go.sum
+/web/build
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# IDE/Editor Folders
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*.swm
+*.swl
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Debug
+__debug_bin*
+
+# React
+node_modules
+package-lock.json
+
+# Helm
+Chart.lock
+tools/helm/g-fe-server/charts/mongodb-15.1.7.tgz
+tools/helm/g-fe-server/charts/prometheus-1.0.9.tgz
+tools/helm/g-fe-server/charts/zipkin-0.3.3.tgz
