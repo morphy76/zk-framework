@@ -77,9 +77,9 @@ const (
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
 type ZKFramework struct {
-	Url     string
-	State   ZKFrameworkState
-	Started bool
+	url     string
+	state   ZKFrameworkState
+	started bool
 
 	cn     *zk.Conn
 	events <-chan zk.Event
@@ -92,17 +92,38 @@ type ZKFramework struct {
 }
 
 /*
+Url returns the URL of the Zookeeper client.
+*/
+func (c *ZKFramework) Url() string {
+	return c.url
+}
+
+/*
+State returns the state of the Zookeeper client.
+*/
+func (c *ZKFramework) State() ZKFrameworkState {
+	return c.state
+}
+
+/*
+Started returns whether the Zookeeper client is started.
+*/
+func (c *ZKFramework) Started() bool {
+	return c.started
+}
+
+/*
 Start connects to the Zookeeper server and starts watching connection events.
 */
 func (c *ZKFramework) Start() error {
-	if c.Started {
+	if c.started {
 		return ErrFrameworkAlreadyStarted
 	}
 
-	log.Printf("connecting to Zookeeper server at %s", c.Url)
+	log.Printf("connecting to Zookeeper server at %s", c.url)
 
-	c.Started = true
-	cn, events, err := zk.Connect([]string{c.Url}, 10*time.Second)
+	c.started = true
+	cn, events, err := zk.Connect([]string{c.url}, 10*time.Second)
 
 	if err != nil {
 		return err
@@ -122,11 +143,11 @@ func (c *ZKFramework) Start() error {
 WaitConnection waits for the connection to the Zookeeper server to be established.
 */
 func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
-	if !c.Started {
+	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
 
-	log.Printf("waiting for connection to Zookeeper server at %s", c.Url)
+	log.Printf("waiting for connection to Zookeeper server at %s", c.url)
 
 	c.shutdownConsumers++
 	defer func() {
@@ -142,7 +163,7 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 		select {
 		case state := <-c.statusChange:
 			if ZKFrameworkState(state) == Connected {
-				log.Printf("connected to Zookeeper server at %s", c.Url)
+				log.Printf("connected to Zookeeper server at %s", c.url)
 				return nil
 			}
 		case <-c.shutdown:
@@ -157,19 +178,19 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 Stop closes the connection to the Zookeeper server.
 */
 func (c *ZKFramework) Stop() error {
-	if !c.Started {
+	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
 
-	log.Printf("closing connection to Zookeeper server at %s", c.Url)
+	log.Printf("closing connection to Zookeeper server at %s", c.url)
 
 	for i := 0; i < c.shutdownConsumers; i++ {
 		c.shutdown <- true
 	}
 
 	c.cn.Close()
-	c.State = Disconnected
-	c.Started = false
+	c.state = Disconnected
+	c.started = false
 
 	close(c.statusChange)
 	close(c.shutdown)
@@ -178,7 +199,7 @@ func (c *ZKFramework) Stop() error {
 }
 
 func (c *ZKFramework) watchEvents() {
-	log.Printf("watching events from Zookeeper server at %s", c.Url)
+	log.Printf("watching events from Zookeeper server at %s", c.url)
 
 	c.shutdownConsumers++
 	defer func() {
@@ -198,7 +219,7 @@ func (c *ZKFramework) watchEvents() {
 }
 
 func (c *ZKFramework) connectionWatcher() {
-	log.Printf("watching connection to Zookeeper server at %s", c.Url)
+	log.Printf("watching connection to Zookeeper server at %s", c.url)
 
 	c.shutdownConsumers++
 	defer func() {
@@ -215,9 +236,9 @@ func (c *ZKFramework) connectionWatcher() {
 		case <-c.shutdown:
 			return
 		case state := <-c.statusChange:
-			c.State = ZKFrameworkState(state)
-			if c.Started && c.State == Disconnected {
-				log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.Url)
+			c.state = ZKFrameworkState(state)
+			if c.started && c.state == Disconnected {
+				log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.url)
 				// try to reconnect, see retry policies
 				// https://curator.apache.org/apidocs/org/apache/curator/RetryPolicy.html
 			}
@@ -231,8 +252,9 @@ func CreateFramework(url string) (*ZKFramework, error) {
 	}
 
 	return &ZKFramework{
-		Url:   url,
-		State: Disconnected,
+		url:     url,
+		state:   Disconnected,
+		started: false,
 
 		shutdownConsumers:     0,
 		statusChangeConsumers: 0,

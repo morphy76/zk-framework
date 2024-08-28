@@ -52,10 +52,10 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Url != url {
-			t.Errorf("expected URL %s, got %s", url, zkFramework.Url)
+		if zkFramework.Url() != url {
+			t.Errorf("expected URL %s, got %s", url, zkFramework.Url())
 		}
-		if zkFramework.State != framework.Disconnected {
+		if zkFramework.State() != framework.Disconnected {
 			t.Error("expected client to be disconnected")
 		}
 	})
@@ -65,12 +65,6 @@ func TestZKFramework(t *testing.T) {
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
-		}
-		if zkFramework.Url != url {
-			t.Errorf("expected URL %s, got %s", url, zkFramework.Url)
-		}
-		if zkFramework.State != framework.Disconnected {
-			t.Error("expected client to be disconnected")
 		}
 
 		if err := zkFramework.Stop(); err != nil {
@@ -85,12 +79,6 @@ func TestZKFramework(t *testing.T) {
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
-		}
-		if zkFramework.Url != url {
-			t.Errorf("expected URL %s, got %s", url, zkFramework.Url)
-		}
-		if zkFramework.State != framework.Disconnected {
-			t.Error("expected client to be disconnected")
 		}
 
 		if err := zkFramework.WaitConnection(5 * time.Second); err != nil {
@@ -116,7 +104,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.State != framework.Connected {
+		if zkFramework.State() != framework.Connected {
 			t.Error("expected client to be connected")
 		}
 	})
@@ -143,7 +131,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.State != framework.Connected {
+		if zkFramework.State() != framework.Connected {
 			t.Error("expected client to be connected")
 		}
 	})
