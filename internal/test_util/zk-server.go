@@ -32,5 +32,11 @@ func StartTestServer() (testcontainers.Container, context.Context, error) {
 		Started:          true,
 	})
 
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = zkC.Start(ctx)
+
 	return zkC, ctx, err
 }

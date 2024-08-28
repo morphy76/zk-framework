@@ -104,7 +104,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.State() != framework.Connected {
+		if zkFramework.Connected() {
 			t.Error("expected client to be connected")
 		}
 	})
@@ -131,7 +131,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.State() != framework.Connected {
+		if zkFramework.Connected() {
 			t.Error("expected client to be connected")
 		}
 	})
@@ -150,6 +150,32 @@ func TestZKFramework(t *testing.T) {
 
 		err = zkFramework.WaitConnection(0 * time.Second)
 		if err != nil && !framework.IsConnectionTimeout(err) {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Create and start the ZK framework with valid URL, waiting twice", func(t *testing.T) {
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		if zkFramework.Connected() {
+			t.Error("expected client to be connected")
+		}
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 	})

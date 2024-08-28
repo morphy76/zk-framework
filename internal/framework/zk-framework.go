@@ -77,9 +77,10 @@ const (
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
 type ZKFramework struct {
-	url     string
-	state   ZKFrameworkState
-	started bool
+	url           string
+	state         ZKFrameworkState
+	previousState ZKFrameworkState
+	started       bool
 
 	cn     *zk.Conn
 	events <-chan zk.Event
@@ -110,6 +111,10 @@ Started returns whether the Zookeeper client is started.
 */
 func (c *ZKFramework) Started() bool {
 	return c.started
+}
+
+func (c *ZKFramework) Connected() bool {
+	return c.state == Connected
 }
 
 /*
@@ -145,6 +150,10 @@ WaitConnection waits for the connection to the Zookeeper server to be establishe
 func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 	if !c.started {
 		return ErrFrameworkNotYetStarted
+	}
+
+	if c.Connected() {
+		return nil
 	}
 
 	log.Printf("waiting for connection to Zookeeper server at %s", c.url)
@@ -192,8 +201,9 @@ func (c *ZKFramework) Stop() error {
 	c.state = Disconnected
 	c.started = false
 
-	close(c.statusChange)
 	close(c.shutdown)
+	close(c.statusChange)
+	c.statusChange = nil
 
 	return nil
 }
@@ -208,12 +218,14 @@ func (c *ZKFramework) watchEvents() {
 
 	for {
 		select {
-		case event := <-c.events:
-			for i := 0; i < c.statusChangeConsumers; i++ {
-				c.statusChange <- event.State
-			}
 		case <-c.shutdown:
 			return
+		case event := <-c.events:
+			for i := 0; i < c.statusChangeConsumers; i++ {
+				if c.statusChange != nil {
+					c.statusChange <- event.State
+				}
+			}
 		}
 	}
 }
@@ -236,8 +248,9 @@ func (c *ZKFramework) connectionWatcher() {
 		case <-c.shutdown:
 			return
 		case state := <-c.statusChange:
+			c.previousState = c.state
 			c.state = ZKFrameworkState(state)
-			if c.started && c.state == Disconnected {
+			if c.started && c.previousState == Connected && c.state == Disconnected {
 				log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.url)
 				// try to reconnect, see retry policies
 				// https://curator.apache.org/apidocs/org/apache/curator/RetryPolicy.html
