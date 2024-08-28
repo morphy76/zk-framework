@@ -2,7 +2,10 @@ module github.com/morphy76/zk
 
 go 1.22.6
 
-require github.com/testcontainers/testcontainers-go v0.33.0
+require (
+	github.com/go-zookeeper/zk v1.0.4
+	github.com/testcontainers/testcontainers-go v0.33.0
+)
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
