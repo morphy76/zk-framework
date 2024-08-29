@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	zkHostEnv          = "ZK_HOST"
-	unexpectedErrorFmt = "unexpected error %v"
+	zkHostEnv                   = "ZK_HOST"
+	unexpectedErrorFmt          = "unexpected error %v"
+	expectedClientToBeConnected = "expected client to be connected"
 )
 
 func TestMain(m *testing.M) {
@@ -40,6 +41,7 @@ func TestMain(m *testing.M) {
 func TestZKFramework(t *testing.T) {
 
 	t.Run("Create a ZK framework with empty URL", func(t *testing.T) {
+		t.Log("Create a ZK framework with empty URL")
 		_, err := framework.CreateFramework("")
 		if !framework.IsInvalidConnectionURL(err) {
 			t.Errorf("expected error %v, got %v", framework.ErrInvalidConnectionURL, err)
@@ -47,6 +49,7 @@ func TestZKFramework(t *testing.T) {
 	})
 
 	t.Run("Create a non-started framework with valid URL", func(t *testing.T) {
+		t.Log("Create a non-started framework with valid URL")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -55,12 +58,13 @@ func TestZKFramework(t *testing.T) {
 		if zkFramework.Url() != url {
 			t.Errorf("expected URL %s, got %s", url, zkFramework.Url())
 		}
-		if zkFramework.State() != framework.Disconnected {
+		if zkFramework.Connected() {
 			t.Error("expected client to be disconnected")
 		}
 	})
 
 	t.Run("Stop a non-started framework with valid URL", func(t *testing.T) {
+		t.Log("Stop a non-started framework with valid URL")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -75,6 +79,7 @@ func TestZKFramework(t *testing.T) {
 	})
 
 	t.Run("Wait a non-started framework with valid URL", func(t *testing.T) {
+		t.Log("Wait a non-started framework with valid URL")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -89,6 +94,7 @@ func TestZKFramework(t *testing.T) {
 	})
 
 	t.Run("Create and start the ZK framework with valid URL", func(t *testing.T) {
+		t.Log("Create and start the ZK framework with valid URL")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -105,11 +111,12 @@ func TestZKFramework(t *testing.T) {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		if zkFramework.Connected() {
-			t.Error("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 	})
 
 	t.Run("Create and start twice the ZK framework with valid URL", func(t *testing.T) {
+		t.Log("Create and start twice the ZK framework with valid URL")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -132,11 +139,12 @@ func TestZKFramework(t *testing.T) {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		if zkFramework.Connected() {
-			t.Error("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 	})
 
 	t.Run("Create and start the ZK framework with connection timeout", func(t *testing.T) {
+		t.Log("Create and start the ZK framework with connection timeout")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -155,6 +163,7 @@ func TestZKFramework(t *testing.T) {
 	})
 
 	t.Run("Create and start the ZK framework with valid URL, waiting twice", func(t *testing.T) {
+		t.Log("Create and start the ZK framework with valid URL, waiting twice")
 		url := os.Getenv(zkHostEnv)
 		zkFramework, err := framework.CreateFramework(url)
 		if err != nil {
@@ -171,12 +180,15 @@ func TestZKFramework(t *testing.T) {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		if zkFramework.Connected() {
-			t.Error("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 
 		err = zkFramework.WaitConnection(10 * time.Second)
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
+		}
+		if zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
 		}
 	})
 }

@@ -3,6 +3,7 @@ package framework
 import (
 	"errors"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/go-zookeeper/zk"
@@ -56,21 +57,8 @@ func IsFrameworkNotYetStarted(err error) bool {
 	return err == ErrFrameworkNotYetStarted
 }
 
-/*
-ZKFrameworkState represents the state of the Zookeeper client.
-*/
-type ZKFrameworkState int
-
 const (
-	Connected         ZKFrameworkState = ZKFrameworkState(zk.StateConnected)
-	Disconnected      ZKFrameworkState = ZKFrameworkState(zk.StateDisconnected)
-	AuthFailed        ZKFrameworkState = ZKFrameworkState(zk.StateAuthFailed)
-	Expired           ZKFrameworkState = ZKFrameworkState(zk.StateExpired)
-	Unknown           ZKFrameworkState = ZKFrameworkState(zk.StateUnknown)
-	ConnectedReadOnly ZKFrameworkState = ZKFrameworkState(zk.StateConnectedReadOnly)
-	Connecting        ZKFrameworkState = ZKFrameworkState(zk.StateConnecting)
-	SaslAuthenticated ZKFrameworkState = ZKFrameworkState(zk.StateSaslAuthenticated)
-	SyncConnected     ZKFrameworkState = ZKFrameworkState(zk.StateSyncConnected)
+	defaultReconnectionTimeoutMs = 100
 )
 
 /*
@@ -78,18 +66,20 @@ ZKFramework represents a Zookeeper client with higher level capabilities, wrappi
 */
 type ZKFramework struct {
 	url           string
-	state         ZKFrameworkState
-	previousState ZKFrameworkState
+	state         zk.State
+	previousState zk.State
 	started       bool
 
-	cn     *zk.Conn
-	events <-chan zk.Event
+	cn                    *zk.Conn
+	events                <-chan zk.Event
+	reconnectionTimeoutMs uint64
 
 	shutdown          chan bool
 	shutdownConsumers int
 
 	statusChange          chan zk.State
 	statusChangeConsumers int
+	statusChangeLock      sync.RWMutex
 }
 
 /*
@@ -100,21 +90,17 @@ func (c *ZKFramework) Url() string {
 }
 
 /*
-State returns the state of the Zookeeper client.
-*/
-func (c *ZKFramework) State() ZKFrameworkState {
-	return c.state
-}
-
-/*
 Started returns whether the Zookeeper client is started.
 */
 func (c *ZKFramework) Started() bool {
 	return c.started
 }
 
+/*
+Connected returns whether the Zookeeper client is connected to the server.
+*/
 func (c *ZKFramework) Connected() bool {
-	return c.state == Connected
+	return isConnectedState(c.state)
 }
 
 /*
@@ -128,20 +114,8 @@ func (c *ZKFramework) Start() error {
 	log.Printf("connecting to Zookeeper server at %s", c.url)
 
 	c.started = true
-	cn, events, err := zk.Connect([]string{c.url}, 10*time.Second)
 
-	if err != nil {
-		return err
-	}
-
-	c.cn = cn
-	c.events = events
-	c.shutdown = make(chan bool)
-	c.statusChange = make(chan zk.State)
-
-	go c.connectionWatcher()
-	go c.watchEvents()
-	return nil
+	return c.tryConnect()
 }
 
 /*
@@ -151,6 +125,9 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
+
+	c.statusChangeLock.Lock()
+	defer c.statusChangeLock.Unlock()
 
 	if c.Connected() {
 		return nil
@@ -171,7 +148,7 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 	for {
 		select {
 		case state := <-c.statusChange:
-			if ZKFrameworkState(state) == Connected {
+			if state == zk.StateConnected {
 				log.Printf("connected to Zookeeper server at %s", c.url)
 				return nil
 			}
@@ -190,20 +167,14 @@ func (c *ZKFramework) Stop() error {
 	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
+	defer c.cn.Close()
 
 	log.Printf("closing connection to Zookeeper server at %s", c.url)
-
-	for i := 0; i < c.shutdownConsumers; i++ {
-		c.shutdown <- true
-	}
-
-	c.cn.Close()
-	c.state = Disconnected
 	c.started = false
 
-	close(c.shutdown)
-	close(c.statusChange)
-	c.statusChange = nil
+	c.stopBgTasks()
+
+	c.state = zk.StateDisconnected
 
 	return nil
 }
@@ -222,9 +193,7 @@ func (c *ZKFramework) watchEvents() {
 			return
 		case event := <-c.events:
 			for i := 0; i < c.statusChangeConsumers; i++ {
-				if c.statusChange != nil {
-					c.statusChange <- event.State
-				}
+				c.statusChange <- event.State
 			}
 		}
 	}
@@ -248,15 +217,70 @@ func (c *ZKFramework) connectionWatcher() {
 		case <-c.shutdown:
 			return
 		case state := <-c.statusChange:
-			c.previousState = c.state
-			c.state = ZKFrameworkState(state)
-			if c.started && c.previousState == Connected && c.state == Disconnected {
-				log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.url)
-				// try to reconnect, see retry policies
-				// https://curator.apache.org/apidocs/org/apache/curator/RetryPolicy.html
-			}
+			c.handleStatusChange(state)
 		}
 	}
+}
+
+func (c *ZKFramework) handleStatusChange(state zk.State) {
+	c.statusChangeLock.Lock()
+	defer c.statusChangeLock.Unlock()
+
+	if state == c.state {
+		return
+	}
+
+	c.previousState = c.state
+	c.state = state
+	log.Printf("status change from %s to %s", c.previousState, c.state)
+	if !c.previouslyConnected() && c.Connected() {
+		c.reconnectionTimeoutMs = defaultReconnectionTimeoutMs
+	}
+	if c.started && c.previouslyConnected() && !c.Connected() {
+		log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.url)
+		c.invalidateCn()
+	}
+}
+
+func (c *ZKFramework) tryConnect() error {
+	cn, events, err := zk.Connect([]string{c.url}, 10*time.Second)
+	if err != nil {
+		return err
+	}
+	c.cn = cn
+	c.events = events
+	go c.watchEvents()
+	go c.connectionWatcher()
+
+	return nil
+}
+
+func (c *ZKFramework) invalidateCn() {
+	c.stopBgTasks()
+	<-time.After(time.Duration(c.reconnectionTimeoutMs) * time.Millisecond)
+	c.reconnectionTimeoutMs *= 2
+
+	if c.cn != nil {
+		c.cn.Close()
+	}
+	c.tryConnect()
+}
+
+func (c *ZKFramework) previouslyConnected() bool {
+	return isConnectedState(c.previousState)
+}
+
+func (c *ZKFramework) stopBgTasks() {
+	for i := 0; i < c.shutdownConsumers; i++ {
+		c.shutdown <- true
+	}
+}
+
+func isConnectedState(state zk.State) bool {
+	return state == zk.StateConnected ||
+		state == zk.StateHasSession ||
+		state == zk.StateConnectedReadOnly ||
+		state == zk.StateSaslAuthenticated
 }
 
 func CreateFramework(url string) (*ZKFramework, error) {
@@ -266,10 +290,15 @@ func CreateFramework(url string) (*ZKFramework, error) {
 
 	return &ZKFramework{
 		url:     url,
-		state:   Disconnected,
+		state:   zk.StateDisconnected,
 		started: false,
 
 		shutdownConsumers:     0,
 		statusChangeConsumers: 0,
+		reconnectionTimeoutMs: defaultReconnectionTimeoutMs,
+
+		shutdown:         make(chan bool),
+		statusChange:     make(chan zk.State),
+		statusChangeLock: sync.RWMutex{},
 	}, nil
 }
