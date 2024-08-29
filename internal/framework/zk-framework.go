@@ -293,8 +293,12 @@ func CreateFramework(url string, namespace ...string) (*ZKFramework, error) {
 	if url == "" {
 		return nil, ErrInvalidConnectionURL
 	}
+
 	if len(namespace) == 0 {
 		namespace = []string{""}
+	}
+	for i, n := range namespace {
+		namespace[i] = strings.Trim(n, "/")
 	}
 
 	useNamespace := strings.Join(namespace, "/")
