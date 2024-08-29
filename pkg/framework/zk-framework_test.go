@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/morphy76/zk/internal/framework"
-	testutil "github.com/morphy76/zk/internal/test_util"
+	"github.com/morphy76/zk/pkg/framework"
+	testutil "github.com/morphy76/zk/pkg/test_util"
 )
 
 const (
@@ -111,7 +111,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Connected() {
+		if !zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
 		}
 	})
@@ -139,7 +139,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Connected() {
+		if !zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
 		}
 	})
@@ -180,7 +180,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Connected() {
+		if !zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
 		}
 
@@ -188,7 +188,7 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Connected() {
+		if !zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
 		}
 	})

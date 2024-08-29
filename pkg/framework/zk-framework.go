@@ -3,11 +3,11 @@ package framework
 import (
 	"errors"
 	"log"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/morphy76/zk/pkg/util"
 )
 
 /*
@@ -86,6 +86,10 @@ type ZKFramework struct {
 
 func (c *ZKFramework) Namespace() string {
 	return c.namespace
+}
+
+func (c *ZKFramework) Cn() *zk.Conn {
+	return c.cn
 }
 
 /*
@@ -294,17 +298,10 @@ func CreateFramework(url string, namespace ...string) (*ZKFramework, error) {
 		return nil, ErrInvalidConnectionURL
 	}
 
-	if len(namespace) == 0 {
-		namespace = []string{""}
-	}
-	for i, n := range namespace {
-		namespace[i] = strings.Trim(n, "/")
-	}
-
-	useNamespace := strings.Join(namespace, "/")
+	useNamespace := util.ConcatPaths(namespace...)
 
 	return &ZKFramework{
-		namespace: "/" + strings.TrimSuffix(useNamespace, "/"),
+		namespace: useNamespace,
 		url:       url,
 		state:     zk.StateDisconnected,
 		started:   false,
