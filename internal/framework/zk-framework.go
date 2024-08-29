@@ -3,6 +3,7 @@ package framework
 import (
 	"errors"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,6 +66,7 @@ const (
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
 type ZKFramework struct {
+	namespace     string
 	url           string
 	state         zk.State
 	previousState zk.State
@@ -80,6 +82,10 @@ type ZKFramework struct {
 	statusChange          chan zk.State
 	statusChangeConsumers int
 	statusChangeLock      sync.RWMutex
+}
+
+func (c *ZKFramework) Namespace() string {
+	return c.namespace
 }
 
 /*
@@ -283,15 +289,21 @@ func isConnectedState(state zk.State) bool {
 		state == zk.StateSaslAuthenticated
 }
 
-func CreateFramework(url string) (*ZKFramework, error) {
+func CreateFramework(url string, namespace ...string) (*ZKFramework, error) {
 	if url == "" {
 		return nil, ErrInvalidConnectionURL
 	}
+	if len(namespace) == 0 {
+		namespace = []string{""}
+	}
+
+	useNamespace := strings.Join(namespace, "/")
 
 	return &ZKFramework{
-		url:     url,
-		state:   zk.StateDisconnected,
-		started: false,
+		namespace: "/" + strings.TrimSuffix(useNamespace, "/"),
+		url:       url,
+		state:     zk.StateDisconnected,
+		started:   false,
 
 		shutdownConsumers:     0,
 		statusChangeConsumers: 0,

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/morphy76/zk/internal/framework"
 	testutil "github.com/morphy76/zk/internal/test_util"
 )
@@ -189,6 +190,64 @@ func TestZKFramework(t *testing.T) {
 		}
 		if zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
+		}
+	})
+
+	t.Run("Test empty namespace", func(t *testing.T) {
+		t.Log("Test empty namespace")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if zkFramework.Namespace() != "/" {
+			t.Errorf("expected root namespace, got %s", zkFramework.Namespace())
+		}
+	})
+
+	t.Run("Test non-empty namespace", func(t *testing.T) {
+		t.Log("Test non-empty namespace")
+		ns := uuid.New().String()
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url, ns)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if zkFramework.Namespace() != "/"+ns {
+			t.Errorf("expected /%s namespace, got %s", ns, zkFramework.Namespace())
+		}
+	})
+
+	t.Run("Test multiple namespaces", func(t *testing.T) {
+		t.Log("Test multiple namespaces")
+		ns1 := uuid.New().String()
+		ns2 := uuid.New().String()
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url, ns1, ns2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if zkFramework.Namespace() != "/"+ns1+"/"+ns2 {
+			t.Errorf("expected /%s/%s namespace, got %s", ns1, ns2, zkFramework.Namespace())
+		}
+	})
+
+	t.Run("Test multiple namespaces with trailing slash", func(t *testing.T) {
+		t.Log("Test multiple namespaces with trailing slash")
+		ns1 := uuid.New().String()
+		ns2 := uuid.New().String()
+		ns3 := uuid.New().String()
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url, "/"+ns1, "/"+ns2+"/", ns3+"/")
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if zkFramework.Namespace() != "/"+ns1+"/"+ns2+"/"+ns3 {
+			t.Errorf("expected /%s/%s/%s namespace, got %s", ns1, ns2, ns3, zkFramework.Namespace())
 		}
 	})
 }
