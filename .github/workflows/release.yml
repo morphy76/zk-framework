@@ -13,12 +13,11 @@ jobs:
     if: ${{github.event.pull_request.merged == true}}
 
     steps:
-      - uses: radcortez/project-metadata-action@main
-        name: Retrieve project metadata
-        id: metadata
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          metadata-file-path: '.github/project.yml'
+      - name: Read version from descriptor
+        id: read_version
+        run: |
+          VERSION=$(cat .github/version)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - uses: actions/checkout@v2
 
@@ -33,8 +32,8 @@ jobs:
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-            tag_name: ${{steps.metadata.outputs.current-version}}
-            release_name: ${{steps.metadata.outputs.current-version}}
+            tag_name: ${{ env.VERSION }}
+            release_name: ${{ env.VERSION }}
             draft: false
             prerelease: false
 
