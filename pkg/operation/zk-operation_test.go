@@ -5,9 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
 	testutil "github.com/morphy76/zk/pkg/test_util"
+	"github.com/morphy76/zk/pkg/util"
 )
 
 const (
@@ -71,6 +73,69 @@ func TestZKOperation(t *testing.T) {
 		}
 		for _, node := range nodes {
 			t.Log(node)
+		}
+	})
+
+	t.Run("Create node", func(t *testing.T) {
+		t.Log("Create node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Errorf("expected client to be connected")
+		}
+
+		nodeName := uuid.New().String()
+
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Exists node", func(t *testing.T) {
+		t.Log("Exists node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Errorf("expected client to be connected")
+		}
+
+		nodeName := util.ConcatPaths(uuid.New().String(), uuid.New().String())
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		exists, err := operation.Exists(zkFramework, nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		if !exists {
+			t.Errorf("expected node to exist")
 		}
 	})
 }

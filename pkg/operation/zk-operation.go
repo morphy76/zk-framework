@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/go-zookeeper/zk"
@@ -42,6 +43,34 @@ func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 	}
 }
 
+func Create(zkFramework framework.ZKFramework, nodeName string) error {
+	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	fmt.Println("Creating node at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, createNode(actualPath))
+
+	select {
+	case <-outChan:
+		return nil
+	case err := <-errChan:
+		return err
+	}
+}
+
+func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
+	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	fmt.Println("Checking if node exists at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, existsNode(actualPath))
+
+	select {
+	case out := <-outChan:
+		return out, nil
+	case err := <-errChan:
+		return false, err
+	}
+}
+
 func listNodes(path string) connectionConsumer[[]string] {
 	return func(cn *zk.Conn, outChan chan []string) error {
 		children, _, err := cn.Children(path)
@@ -49,6 +78,32 @@ func listNodes(path string) connectionConsumer[[]string] {
 			return err
 		}
 		outChan <- children
+		return nil
+	}
+}
+
+func createNode(path string) connectionConsumer[bool] {
+	return func(cn *zk.Conn, outChan chan bool) error {
+		// TODO recursive
+		// TODO node type
+		// TODO node data
+		// TODO node ACL
+		_, err := cn.Create(path, []byte{}, 0, zk.WorldACL(zk.PermAll))
+		if err != nil {
+			return err
+		}
+		outChan <- true
+		return nil
+	}
+}
+
+func existsNode(path string) connectionConsumer[bool] {
+	return func(cn *zk.Conn, outChan chan bool) error {
+		exists, _, err := cn.Exists(path)
+		if err != nil {
+			return err
+		}
+		outChan <- exists
 		return nil
 	}
 }
@@ -64,8 +119,11 @@ func execute[T any](zkFramework framework.ZKFramework, cnConsumer connectionCons
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	go func() {
+		defer close(errChan)
 
 		go func() {
+			defer close(outChan)
+
 			err := cnConsumer(zkFramework.Cn(), outChan)
 			if err != nil {
 				errChan <- err
