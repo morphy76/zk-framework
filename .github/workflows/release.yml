@@ -10,13 +10,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     name: release
-    if: ${{github.event.pull_request.merged == true}}
+    if: ${{ github.event.pull_request.merged == true }}
 
     steps:
       - name: Read version from descriptor
         id: read_version
         run: |
-          VERSION=$(cat .github/version)
+          VERSION=$(cat ${{ github.workspace }}/.github/version)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - uses: actions/checkout@v2
