@@ -65,7 +65,18 @@ const (
 /*
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
-type ZKFramework struct {
+type ZKFramework interface {
+	Namespace() string
+	Cn() *zk.Conn
+	Url() string
+	Started() bool
+	Connected() bool
+	Start() error
+	WaitConnection(timeout time.Duration) error
+	Stop() error
+}
+
+type zKFrameworkImpl struct {
 	namespace     string
 	url           string
 	state         zk.State
@@ -84,32 +95,32 @@ type ZKFramework struct {
 	statusChangeLock      sync.RWMutex
 }
 
-func (c *ZKFramework) Namespace() string {
+func (c *zKFrameworkImpl) Namespace() string {
 	return c.namespace
 }
 
-func (c *ZKFramework) Cn() *zk.Conn {
+func (c *zKFrameworkImpl) Cn() *zk.Conn {
 	return c.cn
 }
 
 /*
 Url returns the URL of the Zookeeper client.
 */
-func (c *ZKFramework) Url() string {
+func (c *zKFrameworkImpl) Url() string {
 	return c.url
 }
 
 /*
 Started returns whether the Zookeeper client is started.
 */
-func (c *ZKFramework) Started() bool {
+func (c *zKFrameworkImpl) Started() bool {
 	return c.started
 }
 
 /*
 Connected returns whether the Zookeeper client is connected to the server.
 */
-func (c *ZKFramework) Connected() bool {
+func (c *zKFrameworkImpl) Connected() bool {
 	c.statusChangeLock.RLock()
 	defer c.statusChangeLock.RUnlock()
 	return isConnectedState(c.state)
@@ -118,7 +129,7 @@ func (c *ZKFramework) Connected() bool {
 /*
 Start connects to the Zookeeper server and starts watching connection events.
 */
-func (c *ZKFramework) Start() error {
+func (c *zKFrameworkImpl) Start() error {
 	if c.started {
 		return ErrFrameworkAlreadyStarted
 	}
@@ -133,7 +144,7 @@ func (c *ZKFramework) Start() error {
 /*
 WaitConnection waits for the connection to the Zookeeper server to be established.
 */
-func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
+func (c *zKFrameworkImpl) WaitConnection(timeout time.Duration) error {
 	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
@@ -172,7 +183,7 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 /*
 Stop closes the connection to the Zookeeper server.
 */
-func (c *ZKFramework) Stop() error {
+func (c *zKFrameworkImpl) Stop() error {
 	c.statusChangeLock.Lock()
 	defer c.statusChangeLock.Unlock()
 
@@ -191,7 +202,7 @@ func (c *ZKFramework) Stop() error {
 	return nil
 }
 
-func (c *ZKFramework) watchEvents() {
+func (c *zKFrameworkImpl) watchEvents() {
 	log.Printf("watching events from Zookeeper server at %s", c.url)
 
 	c.shutdownConsumers++
@@ -211,7 +222,7 @@ func (c *ZKFramework) watchEvents() {
 	}
 }
 
-func (c *ZKFramework) connectionWatcher() {
+func (c *zKFrameworkImpl) connectionWatcher() {
 	log.Printf("watching connection to Zookeeper server at %s", c.url)
 
 	c.shutdownConsumers++
@@ -234,7 +245,7 @@ func (c *ZKFramework) connectionWatcher() {
 	}
 }
 
-func (c *ZKFramework) handleStatusChange(state zk.State) {
+func (c *zKFrameworkImpl) handleStatusChange(state zk.State) {
 	c.statusChangeLock.Lock()
 	defer c.statusChangeLock.Unlock()
 
@@ -254,7 +265,7 @@ func (c *ZKFramework) handleStatusChange(state zk.State) {
 	}
 }
 
-func (c *ZKFramework) tryConnect() error {
+func (c *zKFrameworkImpl) tryConnect() error {
 	cn, events, err := zk.Connect([]string{c.url}, 10*time.Second)
 	if err != nil {
 		return err
@@ -267,7 +278,7 @@ func (c *ZKFramework) tryConnect() error {
 	return nil
 }
 
-func (c *ZKFramework) invalidateCn() {
+func (c *zKFrameworkImpl) invalidateCn() {
 	c.stopBgTasks()
 	<-time.After(time.Duration(c.reconnectionTimeoutMs) * time.Millisecond)
 	c.reconnectionTimeoutMs *= 2
@@ -278,11 +289,11 @@ func (c *ZKFramework) invalidateCn() {
 	c.tryConnect()
 }
 
-func (c *ZKFramework) previouslyConnected() bool {
+func (c *zKFrameworkImpl) previouslyConnected() bool {
 	return isConnectedState(c.previousState)
 }
 
-func (c *ZKFramework) stopBgTasks() {
+func (c *zKFrameworkImpl) stopBgTasks() {
 	for i := 0; i < c.shutdownConsumers; i++ {
 		c.shutdown <- true
 	}
@@ -296,14 +307,14 @@ func isConnectedState(state zk.State) bool {
 		state == zk.StateSyncConnected
 }
 
-func CreateFramework(url string, namespace ...string) (*ZKFramework, error) {
+func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 	if url == "" {
 		return nil, ErrInvalidConnectionURL
 	}
 
 	useNamespace := util.ConcatPaths(namespace...)
 
-	return &ZKFramework{
+	return &zKFrameworkImpl{
 		namespace: useNamespace,
 		url:       url,
 		state:     zk.StateDisconnected,

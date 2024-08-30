@@ -28,7 +28,7 @@ type connectionConsumer[T any] func(*zk.Conn, chan T) error
 /*
 Ls lists the nodes at the given path.
 */
-func Ls(zkFramework *framework.ZKFramework, paths ...string) ([]string, error) {
+func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, paths...)...)
 	fmt.Println("Listing nodes at path:", actualPath)
 
@@ -53,7 +53,7 @@ func listNodes(path string) connectionConsumer[[]string] {
 	}
 }
 
-func execute[T any](zkFramework *framework.ZKFramework, cnConsumer connectionConsumer[T]) (chan T, chan error) {
+func execute[T any](zkFramework framework.ZKFramework, cnConsumer connectionConsumer[T]) (chan T, chan error) {
 
 	outChan := make(chan T)
 	errChan := make(chan error)
