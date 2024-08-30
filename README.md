@@ -36,6 +36,6 @@ High level recipes:
 
 - cache
 - locks
-- config set
+- config set and encryption
 - group and leadership
 - ...

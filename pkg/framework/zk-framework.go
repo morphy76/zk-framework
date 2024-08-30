@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"path"
+	"strings"
 	"sync"
 	"time"
 
@@ -312,10 +313,7 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 		return nil, ErrInvalidConnectionURL
 	}
 
-	useNamespace := path.Join(namespace...)
-	if useNamespace == "" {
-		useNamespace = "/"
-	}
+	useNamespace := "/" + strings.TrimPrefix(path.Join(namespace...), "/")
 
 	return &zKFrameworkImpl{
 		// TODO more connection oprions
