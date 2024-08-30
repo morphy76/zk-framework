@@ -18,10 +18,22 @@ ErrFrameworkNotReady is returned when the framework is not ready.
 var ErrFrameworkNotReady = errors.New("framework not ready")
 
 /*
+ErrUnknownNode is returned when the node is unknown.
+*/
+var ErrUnknownNode = errors.New("unknown node")
+
+/*
 IsFrameworkNotReady checks if the error is ErrFrameworkNotReady.
 */
 func IsFrameworkNotReady(err error) bool {
 	return err == ErrFrameworkNotReady
+}
+
+/*
+IsUnknownNode checks if the error is ErrUnknownNode.
+*/
+func IsUnknownNode(err error) bool {
+	return err == ErrUnknownNode
 }
 
 type connectionConsumer[T any] func(*zk.Conn, chan T) error
@@ -43,6 +55,9 @@ func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 	}
 }
 
+/*
+Create creates a node at the given path.
+*/
 func Create(zkFramework framework.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	fmt.Println("Creating node at path:", actualPath)
@@ -58,6 +73,9 @@ func Create(zkFramework framework.ZKFramework, nodeName string) error {
 	}
 }
 
+/*
+Exists checks if a node exists at the given path.
+*/
 func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	fmt.Println("Checking if node exists at path:", actualPath)
@@ -69,6 +87,58 @@ func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
 		return out, nil
 	case err := <-errChan:
 		return false, err
+	}
+}
+
+/*
+Delete deletes a node at the given path.
+*/
+func Delete(zkFramework framework.ZKFramework, nodeName string) error {
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	fmt.Println("Deleting node at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, deleteNode(actualPath))
+
+	select {
+	case <-outChan:
+		return nil
+	case err := <-errChan:
+		return err
+	}
+}
+
+/*
+Update updates a node at the given path.
+*/
+func Update(zkFramework framework.ZKFramework, nodeName string, data []byte) (int32, error) {
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	fmt.Println("Updating node at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, updateNode(actualPath, data))
+
+	select {
+	case out := <-outChan:
+		return out, nil
+	case err := <-errChan:
+		return 0, err
+	}
+}
+
+/*
+Get gets a node at the given path.
+*/
+func Get(zkFramework framework.ZKFramework, nodeName string) ([]byte, error) {
+	// TODO with stats
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	fmt.Println("Getting node at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, getNode(actualPath))
+
+	select {
+	case out := <-outChan:
+		return out, nil
+	case err := <-errChan:
+		return nil, err
 	}
 }
 
@@ -94,6 +164,57 @@ func createNode(path string) connectionConsumer[bool] {
 			return err
 		}
 		outChan <- true
+		return nil
+	}
+}
+
+func deleteNode(path string) connectionConsumer[bool] {
+	return func(cn *zk.Conn, outChan chan bool) error {
+		exists, _, err := cn.Exists(path)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return ErrUnknownNode
+		}
+
+		err = cn.Delete(path, -1)
+		if err != nil {
+			return err
+		}
+		outChan <- true
+		return nil
+	}
+}
+
+func updateNode(path string, data []byte) connectionConsumer[int32] {
+	return func(cn *zk.Conn, outChan chan int32) error {
+		exists, _, err := cn.Exists(path)
+		if err != nil {
+			return err
+		}
+
+		if !exists {
+			return ErrUnknownNode
+		}
+
+		stat, err := cn.Set(path, data, -1)
+		if err != nil {
+			return err
+		}
+		outChan <- stat.Version
+		return nil
+	}
+}
+
+func getNode(path string) connectionConsumer[[]byte] {
+	return func(cn *zk.Conn, outChan chan []byte) error {
+		data, _, err := cn.Get(path)
+		if err != nil {
+			return err
+		}
+		outChan <- data
 		return nil
 	}
 }

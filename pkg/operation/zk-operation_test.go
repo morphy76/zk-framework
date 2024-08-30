@@ -105,6 +105,38 @@ func TestZKOperation(t *testing.T) {
 		}
 	})
 
+	t.Run("Create a duplicated node", func(t *testing.T) {
+		t.Log("Create node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := uuid.New().String()
+
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := operation.Create(zkFramework, nodeName); err == nil {
+			t.Error("expected error to be not nil")
+		}
+	})
+
 	t.Run("Exists node", func(t *testing.T) {
 		t.Log("Exists node")
 		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
@@ -137,6 +169,166 @@ func TestZKOperation(t *testing.T) {
 		}
 		if !exists {
 			t.Errorf("expected node to exist")
+		}
+	})
+
+	t.Run("Delete node", func(t *testing.T) {
+		t.Log("Delete node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := operation.Delete(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Delete non-existent node", func(t *testing.T) {
+		t.Log("Delete non-existent node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
+		if err := operation.Delete(zkFramework, nodeName); err == nil {
+			t.Error("expected error to be not nil")
+		}
+	})
+
+	t.Run("Update node", func(t *testing.T) {
+		t.Log("Update node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		data := []byte(uuid.New().String())
+		version, err := operation.Update(zkFramework, nodeName, []byte(data))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		if version == 0 {
+			t.Errorf("expected version to be non-zero")
+		}
+		t.Logf("Updated node with version: %d", version)
+
+		readData, err := operation.Get(zkFramework, nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		if string(readData) != string(data) {
+			t.Errorf("expected data to be %s, got %s", string(data), string(readData))
+		}
+	})
+
+	t.Run("Update non-existent node", func(t *testing.T) {
+		t.Log("Update non-existent node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
+		data := []byte(uuid.New().String())
+		_, err = operation.Update(zkFramework, nodeName, []byte(data))
+		if err == nil {
+			t.Error("expected error to be not nil")
+		}
+	})
+
+	t.Run("Get non-existent node", func(t *testing.T) {
+		t.Log("Get non-existent node")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
+		_, err = operation.Get(zkFramework, nodeName)
+		if err == nil {
+			t.Error("expected error to be not nil")
 		}
 	})
 }
