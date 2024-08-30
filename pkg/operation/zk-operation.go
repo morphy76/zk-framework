@@ -4,12 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/framework"
-	"github.com/morphy76/zk/pkg/util"
 )
 
 /*
@@ -30,7 +30,7 @@ type connectionConsumer[T any] func(*zk.Conn, chan T) error
 Ls lists the nodes at the given path.
 */
 func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
-	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, paths...)...)
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, paths...)...)
 	fmt.Println("Listing nodes at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, listNodes(actualPath))
@@ -44,11 +44,12 @@ func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 }
 
 func Create(zkFramework framework.ZKFramework, nodeName string) error {
-	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	fmt.Println("Creating node at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, createNode(actualPath))
 
+	path.Join()
 	select {
 	case <-outChan:
 		return nil
@@ -58,7 +59,7 @@ func Create(zkFramework framework.ZKFramework, nodeName string) error {
 }
 
 func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
-	actualPath := util.ConcatPaths(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	fmt.Println("Checking if node exists at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, existsNode(actualPath))
@@ -84,10 +85,10 @@ func listNodes(path string) connectionConsumer[[]string] {
 
 func createNode(path string) connectionConsumer[bool] {
 	return func(cn *zk.Conn, outChan chan bool) error {
-		// TODO recursive
 		// TODO node type
 		// TODO node data
 		// TODO node ACL
+		recursivelyGrantParent(path, cn)
 		_, err := cn.Create(path, []byte{}, 0, zk.WorldACL(zk.PermAll))
 		if err != nil {
 			return err
@@ -95,6 +96,30 @@ func createNode(path string) connectionConsumer[bool] {
 		outChan <- true
 		return nil
 	}
+}
+
+func recursivelyGrantParent(nodeName string, cn *zk.Conn) error {
+	parent := path.Dir(nodeName)
+	if parent == "/" {
+		return nil
+	}
+
+	exists, _, err := cn.Exists(parent)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		err := recursivelyGrantParent(parent, cn)
+		if err != nil {
+			return err
+		}
+		_, err = cn.Create(parent, []byte{}, zk.FlagContainer, zk.WorldACL(zk.PermAll))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func existsNode(path string) connectionConsumer[bool] {

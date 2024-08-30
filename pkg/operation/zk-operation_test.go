@@ -2,6 +2,7 @@ package operation_test
 
 import (
 	"os"
+	"path"
 	"testing"
 	"time"
 
@@ -9,12 +10,12 @@ import (
 	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
 	testutil "github.com/morphy76/zk/pkg/test_util"
-	"github.com/morphy76/zk/pkg/util"
 )
 
 const (
-	zkHostEnv          = "ZK_HOST"
-	unexpectedErrorFmt = "unexpected error %v"
+	zkHostEnv                   = "ZK_HOST"
+	unexpectedErrorFmt          = "unexpected error %v"
+	expectedClientToBeConnected = "expected client to be connected"
 )
 
 func TestMain(m *testing.M) {
@@ -60,7 +61,7 @@ func TestZKOperation(t *testing.T) {
 		}
 
 		if !zkFramework.Connected() {
-			t.Errorf("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 
 		nodes, err := operation.Ls(zkFramework, "/")
@@ -94,7 +95,7 @@ func TestZKOperation(t *testing.T) {
 		}
 
 		if !zkFramework.Connected() {
-			t.Errorf("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 
 		nodeName := uuid.New().String()
@@ -122,10 +123,10 @@ func TestZKOperation(t *testing.T) {
 		}
 
 		if !zkFramework.Connected() {
-			t.Errorf("expected client to be connected")
+			t.Error(expectedClientToBeConnected)
 		}
 
-		nodeName := util.ConcatPaths(uuid.New().String(), uuid.New().String())
+		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		if err := operation.Create(zkFramework, nodeName); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}

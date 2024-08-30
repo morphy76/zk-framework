@@ -3,11 +3,11 @@ package framework
 import (
 	"errors"
 	"log"
+	"path"
 	"sync"
 	"time"
 
 	"github.com/go-zookeeper/zk"
-	"github.com/morphy76/zk/pkg/util"
 )
 
 /*
@@ -312,9 +312,13 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 		return nil, ErrInvalidConnectionURL
 	}
 
-	useNamespace := util.ConcatPaths(namespace...)
+	useNamespace := path.Join(namespace...)
+	if useNamespace == "" {
+		useNamespace = "/"
+	}
 
 	return &zKFrameworkImpl{
+		// TODO more connection oprions
 		namespace: useNamespace,
 		url:       url,
 		state:     zk.StateDisconnected,
