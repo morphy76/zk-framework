@@ -1,6 +1,7 @@
 package framework_test
 
 import (
+	"log"
 	"os"
 	"testing"
 	"time"
@@ -105,9 +106,13 @@ func TestZKFramework(t *testing.T) {
 		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		defer zkFramework.Stop()
+		defer func() {
+			log.Println("Stopping ZK framework")
+			zkFramework.Stop()
+		}()
 
 		err = zkFramework.WaitConnection(10 * time.Second)
+		log.Println("Connection established")
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
@@ -158,8 +163,10 @@ func TestZKFramework(t *testing.T) {
 		defer zkFramework.Stop()
 
 		err = zkFramework.WaitConnection(0 * time.Second)
-		if err != nil && !framework.IsConnectionTimeout(err) {
-			t.Errorf(unexpectedErrorFmt, err)
+		if err != nil {
+			if !framework.IsConnectionTimeout(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
 		}
 	})
 

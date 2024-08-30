@@ -110,6 +110,8 @@ func (c *ZKFramework) Started() bool {
 Connected returns whether the Zookeeper client is connected to the server.
 */
 func (c *ZKFramework) Connected() bool {
+	c.statusChangeLock.RLock()
+	defer c.statusChangeLock.RUnlock()
 	return isConnectedState(c.state)
 }
 
@@ -136,9 +138,6 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 		return ErrFrameworkNotYetStarted
 	}
 
-	c.statusChangeLock.Lock()
-	defer c.statusChangeLock.Unlock()
-
 	if c.Connected() {
 		return nil
 	}
@@ -157,8 +156,8 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 
 	for {
 		select {
-		case state := <-c.statusChange:
-			if state == zk.StateConnected {
+		case <-c.statusChange:
+			if c.Connected() {
 				log.Printf("connected to Zookeeper server at %s", c.url)
 				return nil
 			}
@@ -174,6 +173,9 @@ func (c *ZKFramework) WaitConnection(timeout time.Duration) error {
 Stop closes the connection to the Zookeeper server.
 */
 func (c *ZKFramework) Stop() error {
+	c.statusChangeLock.Lock()
+	defer c.statusChangeLock.Unlock()
+
 	if !c.started {
 		return ErrFrameworkNotYetStarted
 	}
@@ -243,10 +245,10 @@ func (c *ZKFramework) handleStatusChange(state zk.State) {
 	c.previousState = c.state
 	c.state = state
 	log.Printf("status change from %s to %s", c.previousState, c.state)
-	if !c.previouslyConnected() && c.Connected() {
+	if !c.previouslyConnected() && isConnectedState(c.state) {
 		c.reconnectionTimeoutMs = defaultReconnectionTimeoutMs
 	}
-	if c.started && c.previouslyConnected() && !c.Connected() {
+	if c.started && c.previouslyConnected() && !isConnectedState(c.state) {
 		log.Printf("connection to Zookeeper server at %s lost, trying to reconnect", c.url)
 		c.invalidateCn()
 	}
@@ -290,7 +292,8 @@ func isConnectedState(state zk.State) bool {
 	return state == zk.StateConnected ||
 		state == zk.StateHasSession ||
 		state == zk.StateConnectedReadOnly ||
-		state == zk.StateSaslAuthenticated
+		state == zk.StateSaslAuthenticated ||
+		state == zk.StateSyncConnected
 }
 
 func CreateFramework(url string, namespace ...string) (*ZKFramework, error) {
