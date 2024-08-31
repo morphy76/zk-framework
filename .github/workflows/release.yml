@@ -4,7 +4,7 @@ on:
   pull_request:
     types: [closed]
     paths:
-      - '.github/version'
+      - '.github/version.env'
 
 jobs:
   release:
@@ -18,8 +18,7 @@ jobs:
       - name: Read version from descriptor
         id: read_version
         run: |
-          VERSION=$(cat .github/version)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          cat .github/version.env >> $GITHUB_ENV
 
       - name: Configure Git author
         run: |
@@ -28,11 +27,12 @@ jobs:
 
       - name: Create GitHub Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: actions/create-release@latest
         env:
             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
             tag_name: ${{ env.VERSION }}
             release_name: ${{ env.VERSION }}
+            body: ${{ env.DESCRIPTION }}
             draft: false
             prerelease: false
