@@ -1,3 +1,6 @@
+/*
+Baseline CRUD operations on nodes
+*/
 package operation
 
 import (

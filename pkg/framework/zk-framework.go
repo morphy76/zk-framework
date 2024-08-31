@@ -1,3 +1,6 @@
+/*
+Baseline connection manager with reconnection capability
+*/
 package framework
 
 import (
