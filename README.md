@@ -30,6 +30,10 @@ Baseline CRUD operations on nodes
 
 Monitor and notify node changes
 
+### TODO
+
+- Framework status changes, preserve on reconnect, shutdown on stop
+
 ## module `recipes`
 
 High level recipes:

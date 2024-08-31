@@ -200,6 +200,46 @@ func TestZKFramework(t *testing.T) {
 		}
 	})
 
+	t.Run("Create and start-stop the framework twice", func(t *testing.T) {
+		t.Log("Create and start/stop the framework twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		if err := zkFramework.Stop(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+	})
+
 	t.Run("Test empty namespace", func(t *testing.T) {
 		t.Log("Test empty namespace")
 		url := os.Getenv(zkHostEnv)
