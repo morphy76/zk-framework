@@ -1,3 +1,6 @@
+/*
+Package listener provides interfaces for listening to Zookeeper connection status changes and shutdown events.
+*/
 package listener
 
 import (

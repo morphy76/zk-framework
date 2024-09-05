@@ -401,4 +401,84 @@ func TestZKFramework(t *testing.T) {
 			t.Errorf("expected 1 interaction, got %d", mockedListener.Interactions)
 		}
 	})
+
+	t.Run("Add a new shutdown listener", func(t *testing.T) {
+		t.Log("Add a new shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Add the same shutdown listener twice", func(t *testing.T) {
+		t.Log("Add the same shutdown listener twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			if !listener.IsListenerAlreadyExists(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Remove a shutdown listener", func(t *testing.T) {
+		t.Log("Remove a shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Remove a non-existent shutdown listener", func(t *testing.T) {
+		t.Log("Remove a non-existent shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
+			if !listener.IsListenerNotFound(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
 }

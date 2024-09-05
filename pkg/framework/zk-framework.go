@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/go-zookeeper/zk"
@@ -95,11 +96,11 @@ type zKFrameworkImpl struct {
 	reconnectionTimeoutMs uint64
 
 	shutdown          chan bool
-	shutdownConsumers int
-	shutdownListeners map[string]listener.StatusChangeListener
+	shutdownConsumers atomic.Int32
+	shutdownListeners map[string]listener.ShutdownListener
 
 	statusChange          chan zk.State
-	statusChangeConsumers int
+	statusChangeConsumers atomic.Int32
 	statusChangeLock      sync.RWMutex
 	statusChangeListeners map[string]listener.StatusChangeListener
 }
@@ -164,14 +165,14 @@ func (c *zKFrameworkImpl) WaitConnection(timeout time.Duration) error {
 
 	log.Printf("waiting for connection to Zookeeper server at %s", c.url)
 
-	c.shutdownConsumers++
+	c.shutdownConsumers.Add(1)
 	defer func() {
-		c.shutdownConsumers--
+		c.shutdownConsumers.Add(-1)
 	}()
 
-	c.statusChangeConsumers++
+	c.statusChangeConsumers.Add(1)
 	defer func() {
-		c.statusChangeConsumers--
+		c.statusChangeConsumers.Add(-1)
 	}()
 
 	for {
@@ -205,6 +206,7 @@ func (c *zKFrameworkImpl) Stop() error {
 	c.started = false
 
 	c.stopBgTasks()
+	c.NotifyShutdown()
 
 	c.state = zk.StateDisconnected
 
@@ -222,7 +224,7 @@ func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener listener.
 	}
 
 	c.statusChangeListeners[statusChangeListener.UUID()] = statusChangeListener
-	c.statusChangeConsumers++
+	c.statusChangeConsumers.Add(1)
 	return nil
 }
 
@@ -237,7 +239,7 @@ func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener listen
 	}
 
 	delete(c.statusChangeListeners, statusChangeListener.UUID())
-	c.statusChangeConsumers--
+	c.statusChangeConsumers.Add(-1)
 	return nil
 }
 
@@ -257,28 +259,46 @@ func (c *zKFrameworkImpl) NotifyStatusChange() {
 /*
 AddShutdownListener adds a listener for Zookeeper client shutdown events.
 */
-func (c *zKFrameworkImpl) AddShutdownListener(listener listener.ShutdownListener) error {
+func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener listener.ShutdownListener) error {
+	if found := c.shutdownListeners[shutdownListener.UUID()]; found != nil {
+		return listener.ErrListenerAlreadyExists
+	}
+
+	c.shutdownListeners[shutdownListener.UUID()] = shutdownListener
+	c.shutdownConsumers.Add(1)
 	return nil
 }
 
 /*
 RemoveShutdownListener removes a listener for Zookeeper client shutdown events.
 */
-func (c *zKFrameworkImpl) RemoveShutdownListener(listener listener.ShutdownListener) error {
+func (c *zKFrameworkImpl) RemoveShutdownListener(shutdownListener listener.ShutdownListener) error {
+	if found := c.shutdownListeners[shutdownListener.UUID()]; found == nil {
+		return listener.ErrListenerNotFound
+	}
+
+	delete(c.shutdownListeners, shutdownListener.UUID())
+	c.shutdownConsumers.Add(-1)
 	return nil
 }
 
 /*
 NotifyShutdown notifies all listeners of a Zookeeper client shutdown event.
 */
-func (c *zKFrameworkImpl) NotifyShutdown() {}
+func (c *zKFrameworkImpl) NotifyShutdown() {
+	for _, listener := range c.shutdownListeners {
+		if err := listener.OnShutdown(); err != nil {
+			log.Printf("error notifying shutdown listener: %s", err)
+		}
+	}
+}
 
 func (c *zKFrameworkImpl) watchEvents() {
 	log.Printf("watching events from Zookeeper server at %s", c.url)
 
-	c.shutdownConsumers++
+	c.shutdownConsumers.Add(1)
 	defer func() {
-		c.shutdownConsumers--
+		c.shutdownConsumers.Add(-1)
 	}()
 
 	for {
@@ -286,7 +306,7 @@ func (c *zKFrameworkImpl) watchEvents() {
 		case <-c.shutdown:
 			return
 		case event := <-c.events:
-			for i := 0; i < c.statusChangeConsumers; i++ {
+			for i := 0; i < int(c.statusChangeConsumers.Load()); i++ {
 				c.statusChange <- event.State
 			}
 		}
@@ -296,14 +316,14 @@ func (c *zKFrameworkImpl) watchEvents() {
 func (c *zKFrameworkImpl) connectionWatcher() {
 	log.Printf("watching connection to Zookeeper server at %s", c.url)
 
-	c.shutdownConsumers++
+	c.shutdownConsumers.Add(1)
 	defer func() {
-		c.shutdownConsumers--
+		c.shutdownConsumers.Add(-1)
 	}()
 
-	c.statusChangeConsumers++
+	c.statusChangeConsumers.Add(1)
 	defer func() {
-		c.statusChangeConsumers--
+		c.statusChangeConsumers.Add(-1)
 	}()
 
 	for {
@@ -326,7 +346,9 @@ func (c *zKFrameworkImpl) handleStatusChange(state zk.State) {
 
 	c.previousState = c.state
 	c.state = state
+	c.NotifyStatusChange()
 	log.Printf("status change from %s to %s", c.previousState, c.state)
+
 	if !c.previouslyConnected() && isConnectedState(c.state) {
 		c.reconnectionTimeoutMs = defaultReconnectionTimeoutMs
 	}
@@ -365,7 +387,7 @@ func (c *zKFrameworkImpl) previouslyConnected() bool {
 }
 
 func (c *zKFrameworkImpl) stopBgTasks() {
-	for i := 0; i < c.shutdownConsumers; i++ {
+	for i := 0; i < int(c.shutdownConsumers.Load()); i++ {
 		c.shutdown <- true
 	}
 }
@@ -395,12 +417,12 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 		state:     zk.StateDisconnected,
 		started:   false,
 
-		shutdownConsumers:     0,
-		statusChangeConsumers: 0,
+		shutdownConsumers:     atomic.Int32{},
+		statusChangeConsumers: atomic.Int32{},
 		reconnectionTimeoutMs: defaultReconnectionTimeoutMs,
 
 		shutdown:              make(chan bool),
-		shutdownListeners:     make(map[string]listener.StatusChangeListener),
+		shutdownListeners:     make(map[string]listener.ShutdownListener),
 		statusChange:          make(chan zk.State),
 		statusChangeListeners: make(map[string]listener.StatusChangeListener),
 		statusChangeLock:      sync.RWMutex{},
