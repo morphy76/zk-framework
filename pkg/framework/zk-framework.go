@@ -224,7 +224,6 @@ func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener listener.
 	}
 
 	c.statusChangeListeners[statusChangeListener.UUID()] = statusChangeListener
-	c.statusChangeConsumers.Add(1)
 	return nil
 }
 
@@ -239,7 +238,6 @@ func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener listen
 	}
 
 	delete(c.statusChangeListeners, statusChangeListener.UUID())
-	c.statusChangeConsumers.Add(-1)
 	return nil
 }
 
@@ -265,7 +263,6 @@ func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener listener.Shutdown
 	}
 
 	c.shutdownListeners[shutdownListener.UUID()] = shutdownListener
-	c.shutdownConsumers.Add(1)
 	return nil
 }
 
@@ -278,7 +275,6 @@ func (c *zKFrameworkImpl) RemoveShutdownListener(shutdownListener listener.Shutd
 	}
 
 	delete(c.shutdownListeners, shutdownListener.UUID())
-	c.shutdownConsumers.Add(-1)
 	return nil
 }
 

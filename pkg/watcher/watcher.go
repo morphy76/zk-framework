@@ -25,6 +25,20 @@ func IsUnknownNode(err error) bool {
 	return err == ErrUnknownNode
 }
 
+type watchListener struct {
+	ID         string
+	shutdownCh chan bool
+}
+
+func (w watchListener) UUID() string {
+	return w.ID
+}
+
+func (w watchListener) OnShutdown() error {
+	w.shutdownCh <- true
+	return nil
+}
+
 /*
 Set a watcher
 */
@@ -49,11 +63,25 @@ func Set(zkFramework framework.ZKFramework, nodeName string, outChan chan zk.Eve
 		return err
 	}
 
+	shutdown := make(chan bool)
+	listener := watchListener{
+		ID:         nodeName,
+		shutdownCh: shutdown,
+	}
+	if err := zkFramework.AddShutdownListener(listener); err != nil {
+		return err
+	}
+
 	go func() {
-		// TODO framework status changes, preserve on reconnect, shutdown on stop
-		for e := range out {
-			if slices.Contains(types, e.Type) {
-				outChan <- e
+		for {
+			select {
+			case <-shutdown:
+				zkFramework.RemoveShutdownListener(listener)
+				return
+			case e := <-out:
+				if slices.Contains(types, e.Type) {
+					outChan <- e
+				}
 			}
 		}
 	}()

@@ -112,4 +112,40 @@ func TestZKWatcher(t *testing.T) {
 			t.Errorf("expected %v, got %v", watcher.ErrUnknownNode, err)
 		}
 	})
+
+	t.Run("monitor the same node, twice", func(t *testing.T) {
+		t.Log("Set a watcher twice")
+		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		nodeName := uuid.New().String()
+		if err := operation.Create(zkFramework, nodeName); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		events := make(chan zk.Event)
+		if err := watcher.Set(zkFramework, nodeName, events, zk.EventNodeDataChanged); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := watcher.Set(zkFramework, nodeName, events, zk.EventNodeDataChanged); err == nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
 }
