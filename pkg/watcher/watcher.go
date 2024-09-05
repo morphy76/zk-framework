@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"path"
 	"slices"
+	"strings"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/framework"
@@ -52,7 +53,21 @@ func Set(zkFramework framework.ZKFramework, nodeName string, outChan chan zk.Eve
 			zk.EventNodeDeleted,
 		}
 	}
-	fmt.Printf("Set watcher at path %s for types %v\n", actualPath, types)
+	slices.Sort(types)
+
+	nameParts := make([]string, 0, len(types)+1)
+	for _, t := range types {
+		nameParts = append(nameParts, fmt.Sprintf("%d", t))
+	}
+	nameParts = append(nameParts, nodeName)
+
+	shutdown := make(chan bool)
+	listener := watchListener{
+		ID:         strings.Join(nameParts, "-"),
+		shutdownCh: shutdown,
+	}
+
+	fmt.Printf("Set watcher at path %s for types %v with name %s\n", actualPath, types, listener.UUID())
 
 	cn := zkFramework.Cn()
 	exists, _, out, err := cn.ExistsW(actualPath)
@@ -61,12 +76,6 @@ func Set(zkFramework framework.ZKFramework, nodeName string, outChan chan zk.Eve
 	}
 	if err != nil {
 		return err
-	}
-
-	shutdown := make(chan bool)
-	listener := watchListener{
-		ID:         nodeName,
-		shutdownCh: shutdown,
 	}
 	if err := zkFramework.AddShutdownListener(listener); err != nil {
 		return err
