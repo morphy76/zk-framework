@@ -6,6 +6,7 @@ package watcher
 import (
 	"errors"
 	"fmt"
+	"log"
 	"path"
 	"slices"
 	"strings"
@@ -67,7 +68,7 @@ func Set(zkFramework framework.ZKFramework, nodeName string, outChan chan zk.Eve
 		shutdownCh: shutdown,
 	}
 
-	fmt.Printf("Set watcher at path %s for types %v with name %s\n", actualPath, types, listener.UUID())
+	log.Printf("Set watcher at path %s for types %v with name %s\n", actualPath, types, listener.UUID())
 
 	cn := zkFramework.Cn()
 	exists, _, out, err := cn.ExistsW(actualPath)

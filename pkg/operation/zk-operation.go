@@ -6,7 +6,7 @@ package operation
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"path"
 	"strings"
 	"time"
@@ -46,7 +46,7 @@ Ls lists the nodes at the given path.
 */
 func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, paths...)...)
-	fmt.Println("Listing nodes at path:", actualPath)
+	log.Println("Listing nodes at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, listNodes(actualPath))
 
@@ -63,7 +63,7 @@ Create creates a node at the given path.
 */
 func Create(zkFramework framework.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
-	fmt.Println("Creating node at path:", actualPath)
+	log.Println("Creating node at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, createNode(actualPath))
 
@@ -81,7 +81,7 @@ Exists checks if a node exists at the given path.
 */
 func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
-	fmt.Println("Checking if node exists at path:", actualPath)
+	log.Println("Checking if node exists at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, existsNode(actualPath))
 
@@ -98,7 +98,7 @@ Delete deletes a node at the given path.
 */
 func Delete(zkFramework framework.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
-	fmt.Println("Deleting node at path:", actualPath)
+	log.Println("Deleting node at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, deleteNode(actualPath))
 
@@ -115,7 +115,7 @@ Update updates a node at the given path.
 */
 func Update(zkFramework framework.ZKFramework, nodeName string, data []byte) (int32, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
-	fmt.Println("Updating node at path:", actualPath)
+	log.Println("Updating node at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, updateNode(actualPath, data))
 
@@ -133,7 +133,7 @@ Get gets a node at the given path.
 func Get(zkFramework framework.ZKFramework, nodeName string) ([]byte, error) {
 	// TODO with stats
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
-	fmt.Println("Getting node at path:", actualPath)
+	log.Println("Getting node at path:", actualPath)
 
 	outChan, errChan := execute(zkFramework, getNode(actualPath))
 
