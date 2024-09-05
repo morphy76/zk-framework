@@ -1,5 +1,5 @@
 /*
-Baseline CRUD operations on nodes
+Package operation provides operations on Zookeeper nodes.
 */
 package operation
 

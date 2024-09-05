@@ -7,9 +7,9 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/google/uuid"
+	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
-	testutil "github.com/morphy76/zk/pkg/test_util"
 	"github.com/morphy76/zk/pkg/watcher"
 )
 

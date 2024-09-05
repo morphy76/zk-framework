@@ -1,5 +1,5 @@
 /*
-Monitor and notify node changes
+Package watcher provides a way to watch for changes in Zookeeper nodes.
 */
 package watcher
 

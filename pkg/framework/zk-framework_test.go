@@ -7,8 +7,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/morphy76/zk/internal/framework/listener"
+	testutil "github.com/morphy76/zk/internal/test_util"
+	"github.com/morphy76/zk/internal/test_util/mocks"
 	"github.com/morphy76/zk/pkg/framework"
-	testutil "github.com/morphy76/zk/pkg/test_util"
 )
 
 const (
@@ -57,8 +59,8 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Url() != url {
-			t.Errorf("expected URL %s, got %s", url, zkFramework.Url())
+		if zkFramework.URL() != url {
+			t.Errorf("expected URL %s, got %s", url, zkFramework.URL())
 		}
 		if zkFramework.Connected() {
 			t.Error("expected client to be disconnected")
@@ -295,6 +297,108 @@ func TestZKFramework(t *testing.T) {
 
 		if zkFramework.Namespace() != "/"+ns1+"/"+ns2+"/"+ns3 {
 			t.Errorf("expected /%s/%s/%s namespace, got %s", ns1, ns2, ns3, zkFramework.Namespace())
+		}
+	})
+
+	t.Run("Add a new status change listener", func(t *testing.T) {
+		t.Log("Add a new status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Add the same status change listener twice", func(t *testing.T) {
+		t.Log("Add the same status change listener twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			if !listener.IsListenerAlreadyExists(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Remove a status change listener", func(t *testing.T) {
+		t.Log("Remove a status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Remove a non-existent status change listener", func(t *testing.T) {
+		t.Log("Remove a non-existent status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
+			if !listener.IsListenerNotFound(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Test interaction when notifying status change listeners", func(t *testing.T) {
+		t.Log("Test interaction when notifying status change listeners")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		zkFramework.NotifyStatusChange()
+		if mockedListener.Interactions != 1 {
+			t.Errorf("expected 1 interaction, got %d", mockedListener.Interactions)
 		}
 	})
 }

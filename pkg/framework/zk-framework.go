@@ -1,5 +1,5 @@
 /*
-Baseline connection manager with reconnection capability
+Package framework provides a higher level Zookeeper client with more capabilities than the standard Zookeeper client.
 */
 package framework
 
@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/morphy76/zk/internal/framework/listener"
 )
 
 /*
@@ -70,9 +71,11 @@ const (
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
 type ZKFramework interface {
+	listener.StatusChangeHandler
+	listener.ShutdownHandler
 	Namespace() string
 	Cn() *zk.Conn
-	Url() string
+	URL() string
 	Started() bool
 	Connected() bool
 	Start() error
@@ -93,10 +96,12 @@ type zKFrameworkImpl struct {
 
 	shutdown          chan bool
 	shutdownConsumers int
+	shutdownListeners map[string]listener.StatusChangeListener
 
 	statusChange          chan zk.State
 	statusChangeConsumers int
 	statusChangeLock      sync.RWMutex
+	statusChangeListeners map[string]listener.StatusChangeListener
 }
 
 func (c *zKFrameworkImpl) Namespace() string {
@@ -110,7 +115,7 @@ func (c *zKFrameworkImpl) Cn() *zk.Conn {
 /*
 Url returns the URL of the Zookeeper client.
 */
-func (c *zKFrameworkImpl) Url() string {
+func (c *zKFrameworkImpl) URL() string {
 	return c.url
 }
 
@@ -205,6 +210,68 @@ func (c *zKFrameworkImpl) Stop() error {
 
 	return nil
 }
+
+/*
+AddStatusChangeListener adds a listener for Zookeeper connection status changes.
+*/
+func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener listener.StatusChangeListener) error {
+	// TODO locks
+
+	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found != nil {
+		return listener.ErrListenerAlreadyExists
+	}
+
+	c.statusChangeListeners[statusChangeListener.UUID()] = statusChangeListener
+	c.statusChangeConsumers++
+	return nil
+}
+
+/*
+RemoveStatusChangeListener removes a listener for Zookeeper connection status changes.
+*/
+func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener listener.StatusChangeListener) error {
+	// TODO locks
+
+	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found == nil {
+		return listener.ErrListenerNotFound
+	}
+
+	delete(c.statusChangeListeners, statusChangeListener.UUID())
+	c.statusChangeConsumers--
+	return nil
+}
+
+/*
+NotifyStatusChange notifies all listeners of a Zookeeper connection status change.
+*/
+func (c *zKFrameworkImpl) NotifyStatusChange() {
+	// TODO locks
+
+	for _, listener := range c.statusChangeListeners {
+		if err := listener.OnStatusChange(c.previousState, c.state); err != nil {
+			log.Printf("error notifying status change listener: %s", err)
+		}
+	}
+}
+
+/*
+AddShutdownListener adds a listener for Zookeeper client shutdown events.
+*/
+func (c *zKFrameworkImpl) AddShutdownListener(listener listener.ShutdownListener) error {
+	return nil
+}
+
+/*
+RemoveShutdownListener removes a listener for Zookeeper client shutdown events.
+*/
+func (c *zKFrameworkImpl) RemoveShutdownListener(listener listener.ShutdownListener) error {
+	return nil
+}
+
+/*
+NotifyShutdown notifies all listeners of a Zookeeper client shutdown event.
+*/
+func (c *zKFrameworkImpl) NotifyShutdown() {}
 
 func (c *zKFrameworkImpl) watchEvents() {
 	log.Printf("watching events from Zookeeper server at %s", c.url)
@@ -311,6 +378,9 @@ func isConnectedState(state zk.State) bool {
 		state == zk.StateSyncConnected
 }
 
+/*
+CreateFramework creates a new Zookeeper client with the given connection URL and namespace.
+*/
 func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 	if url == "" {
 		return nil, ErrInvalidConnectionURL
@@ -319,7 +389,7 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 	useNamespace := "/" + strings.TrimPrefix(path.Join(namespace...), "/")
 
 	return &zKFrameworkImpl{
-		// TODO more connection oprions
+		// TODO more connection options
 		namespace: useNamespace,
 		url:       url,
 		state:     zk.StateDisconnected,
@@ -329,8 +399,10 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 		statusChangeConsumers: 0,
 		reconnectionTimeoutMs: defaultReconnectionTimeoutMs,
 
-		shutdown:         make(chan bool),
-		statusChange:     make(chan zk.State),
-		statusChangeLock: sync.RWMutex{},
+		shutdown:              make(chan bool),
+		shutdownListeners:     make(map[string]listener.StatusChangeListener),
+		statusChange:          make(chan zk.State),
+		statusChangeListeners: make(map[string]listener.StatusChangeListener),
+		statusChangeLock:      sync.RWMutex{},
 	}, nil
 }
