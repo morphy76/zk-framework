@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/morphy76/zk/internal/framework/listener"
 	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/internal/test_util/mocks"
+	"github.com/morphy76/zk/pkg/core"
 	"github.com/morphy76/zk/pkg/framework"
 )
 
@@ -334,7 +334,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
-			if !listener.IsListenerAlreadyExists(err) {
+			if !core.IsListenerAlreadyExists(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -374,7 +374,7 @@ func TestZKFramework(t *testing.T) {
 			Interactions: 0,
 		}
 		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
-			if !listener.IsListenerNotFound(err) {
+			if !core.IsListenerNotFound(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -436,7 +436,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
-			if !listener.IsListenerAlreadyExists(err) {
+			if !core.IsListenerAlreadyExists(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -476,7 +476,7 @@ func TestZKFramework(t *testing.T) {
 			Interactions: 0,
 		}
 		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
-			if !listener.IsListenerNotFound(err) {
+			if !core.IsListenerNotFound(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}

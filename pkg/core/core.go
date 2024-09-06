@@ -1,10 +1,11 @@
 /*
-Package listener provides interfaces for listening to Zookeeper connection status changes and shutdown events.
+Package core provides the core interfaces for the Zookeeper framework.
 */
-package listener
+package core
 
 import (
 	"errors"
+	"time"
 
 	"github.com/go-zookeeper/zk"
 )
@@ -34,11 +35,19 @@ func IsListenerNotFound(err error) bool {
 }
 
 /*
-StatusChangeListener is an interface for listening to Zookeeper connection status changes.
+ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
 */
-type StatusChangeListener interface {
-	UUID() string
-	OnStatusChange(previous zk.State, current zk.State) error
+type ZKFramework interface {
+	StatusChangeHandler
+	ShutdownHandler
+	Namespace() string
+	Cn() *zk.Conn
+	URL() string
+	Started() bool
+	Connected() bool
+	Start() error
+	WaitConnection(timeout time.Duration) error
+	Stop() error
 }
 
 /*
@@ -51,18 +60,26 @@ type StatusChangeHandler interface {
 }
 
 /*
-ShutdownListener is an interface for listening to Zookeeper client shutdown events.
-*/
-type ShutdownListener interface {
-	UUID() string
-	OnShutdown() error
-}
-
-/*
 ShutdownHandler is an interface for shutting down the Zookeeper client.
 */
 type ShutdownHandler interface {
 	AddShutdownListener(listener ShutdownListener) error
 	RemoveShutdownListener(listener ShutdownListener) error
 	NotifyShutdown()
+}
+
+/*
+StatusChangeListener is an interface for listening to Zookeeper connection status changes.
+*/
+type StatusChangeListener interface {
+	UUID() string
+	OnStatusChange(zkFramework ZKFramework, previous zk.State, current zk.State) error
+}
+
+/*
+ShutdownListener is an interface for listening to Zookeeper client shutdown events.
+*/
+type ShutdownListener interface {
+	UUID() string
+	OnShutdown(zkFramework ZKFramework) error
 }

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
-	"github.com/morphy76/zk/internal/framework/listener"
+	"github.com/morphy76/zk/pkg/core"
 )
 
 /*
@@ -68,22 +68,6 @@ const (
 	defaultReconnectionTimeoutMs = 100
 )
 
-/*
-ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
-*/
-type ZKFramework interface {
-	listener.StatusChangeHandler
-	listener.ShutdownHandler
-	Namespace() string
-	Cn() *zk.Conn
-	URL() string
-	Started() bool
-	Connected() bool
-	Start() error
-	WaitConnection(timeout time.Duration) error
-	Stop() error
-}
-
 type zKFrameworkImpl struct {
 	namespace     string
 	url           string
@@ -97,12 +81,12 @@ type zKFrameworkImpl struct {
 
 	shutdown          chan bool
 	shutdownConsumers atomic.Int32
-	shutdownListeners map[string]listener.ShutdownListener
+	shutdownListeners map[string]core.ShutdownListener
 
 	statusChange          chan zk.State
 	statusChangeConsumers atomic.Int32
 	statusChangeLock      sync.RWMutex
-	statusChangeListeners map[string]listener.StatusChangeListener
+	statusChangeListeners map[string]core.StatusChangeListener
 }
 
 func (c *zKFrameworkImpl) Namespace() string {
@@ -216,11 +200,11 @@ func (c *zKFrameworkImpl) Stop() error {
 /*
 AddStatusChangeListener adds a listener for Zookeeper connection status changes.
 */
-func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener listener.StatusChangeListener) error {
+func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener core.StatusChangeListener) error {
 	// TODO locks
 
 	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found != nil {
-		return listener.ErrListenerAlreadyExists
+		return core.ErrListenerAlreadyExists
 	}
 
 	c.statusChangeListeners[statusChangeListener.UUID()] = statusChangeListener
@@ -230,11 +214,11 @@ func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener listener.
 /*
 RemoveStatusChangeListener removes a listener for Zookeeper connection status changes.
 */
-func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener listener.StatusChangeListener) error {
+func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener core.StatusChangeListener) error {
 	// TODO locks
 
 	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found == nil {
-		return listener.ErrListenerNotFound
+		return core.ErrListenerNotFound
 	}
 
 	delete(c.statusChangeListeners, statusChangeListener.UUID())
@@ -248,7 +232,7 @@ func (c *zKFrameworkImpl) NotifyStatusChange() {
 	// TODO locks
 
 	for _, listener := range c.statusChangeListeners {
-		if err := listener.OnStatusChange(c.previousState, c.state); err != nil {
+		if err := listener.OnStatusChange(c, c.previousState, c.state); err != nil {
 			log.Printf("error notifying status change listener: %s", err)
 		}
 	}
@@ -257,9 +241,9 @@ func (c *zKFrameworkImpl) NotifyStatusChange() {
 /*
 AddShutdownListener adds a listener for Zookeeper client shutdown events.
 */
-func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener listener.ShutdownListener) error {
+func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener core.ShutdownListener) error {
 	if found := c.shutdownListeners[shutdownListener.UUID()]; found != nil {
-		return listener.ErrListenerAlreadyExists
+		return core.ErrListenerAlreadyExists
 	}
 
 	c.shutdownListeners[shutdownListener.UUID()] = shutdownListener
@@ -269,9 +253,9 @@ func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener listener.Shutdown
 /*
 RemoveShutdownListener removes a listener for Zookeeper client shutdown events.
 */
-func (c *zKFrameworkImpl) RemoveShutdownListener(shutdownListener listener.ShutdownListener) error {
+func (c *zKFrameworkImpl) RemoveShutdownListener(shutdownListener core.ShutdownListener) error {
 	if found := c.shutdownListeners[shutdownListener.UUID()]; found == nil {
-		return listener.ErrListenerNotFound
+		return core.ErrListenerNotFound
 	}
 
 	delete(c.shutdownListeners, shutdownListener.UUID())
@@ -283,7 +267,7 @@ NotifyShutdown notifies all listeners of a Zookeeper client shutdown event.
 */
 func (c *zKFrameworkImpl) NotifyShutdown() {
 	for _, listener := range c.shutdownListeners {
-		if err := listener.OnShutdown(); err != nil {
+		if err := listener.OnShutdown(c); err != nil {
 			log.Printf("error notifying shutdown listener: %s", err)
 		}
 	}
@@ -399,7 +383,7 @@ func isConnectedState(state zk.State) bool {
 /*
 CreateFramework creates a new Zookeeper client with the given connection URL and namespace.
 */
-func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
+func CreateFramework(url string, namespace ...string) (core.ZKFramework, error) {
 	if url == "" {
 		return nil, ErrInvalidConnectionURL
 	}
@@ -418,9 +402,9 @@ func CreateFramework(url string, namespace ...string) (ZKFramework, error) {
 		reconnectionTimeoutMs: defaultReconnectionTimeoutMs,
 
 		shutdown:              make(chan bool),
-		shutdownListeners:     make(map[string]listener.ShutdownListener),
+		shutdownListeners:     make(map[string]core.ShutdownListener),
 		statusChange:          make(chan zk.State),
-		statusChangeListeners: make(map[string]listener.StatusChangeListener),
+		statusChangeListeners: make(map[string]core.StatusChangeListener),
 		statusChangeLock:      sync.RWMutex{},
 	}, nil
 }

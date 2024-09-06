@@ -32,7 +32,7 @@ Monitor and notify node changes
 
 ### TODO
 
-- Framework status changes, preserve on reconnect, shutdown on stop
+- Framework status changes, preserve on reconnect
 
 ## module `recipes`
 

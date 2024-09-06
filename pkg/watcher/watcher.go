@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/go-zookeeper/zk"
-	"github.com/morphy76/zk/pkg/framework"
+	"github.com/morphy76/zk/pkg/core"
 )
 
 /*
@@ -36,7 +36,7 @@ func (w watchListener) UUID() string {
 	return w.ID
 }
 
-func (w watchListener) OnShutdown() error {
+func (w watchListener) OnShutdown(zkFramework core.ZKFramework) error {
 	w.shutdownCh <- true
 	return nil
 }
@@ -44,7 +44,7 @@ func (w watchListener) OnShutdown() error {
 /*
 Set a watcher
 */
-func Set(zkFramework framework.ZKFramework, nodeName string, outChan chan zk.Event, types ...zk.EventType) error {
+func Set(zkFramework core.ZKFramework, nodeName string, outChan chan zk.Event, types ...zk.EventType) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, nodeName)...)
 	if len(types) == 0 {
 		types = []zk.EventType{

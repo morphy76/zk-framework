@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/morphy76/zk/pkg/core"
 	"github.com/morphy76/zk/pkg/framework"
 )
 
@@ -44,7 +45,7 @@ type connectionConsumer[T any] func(*zk.Conn, chan T) error
 /*
 Ls lists the nodes at the given path.
 */
-func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
+func Ls(zkFramework core.ZKFramework, paths ...string) ([]string, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, paths...)...)
 	log.Println("Listing nodes at path:", actualPath)
 
@@ -61,7 +62,7 @@ func Ls(zkFramework framework.ZKFramework, paths ...string) ([]string, error) {
 /*
 Create creates a node at the given path.
 */
-func Create(zkFramework framework.ZKFramework, nodeName string) error {
+func Create(zkFramework core.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Creating node at path:", actualPath)
 
@@ -79,7 +80,7 @@ func Create(zkFramework framework.ZKFramework, nodeName string) error {
 /*
 Exists checks if a node exists at the given path.
 */
-func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
+func Exists(zkFramework core.ZKFramework, nodeName string) (bool, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Checking if node exists at path:", actualPath)
 
@@ -96,7 +97,7 @@ func Exists(zkFramework framework.ZKFramework, nodeName string) (bool, error) {
 /*
 Delete deletes a node at the given path.
 */
-func Delete(zkFramework framework.ZKFramework, nodeName string) error {
+func Delete(zkFramework core.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Deleting node at path:", actualPath)
 
@@ -113,7 +114,7 @@ func Delete(zkFramework framework.ZKFramework, nodeName string) error {
 /*
 Update updates a node at the given path.
 */
-func Update(zkFramework framework.ZKFramework, nodeName string, data []byte) (int32, error) {
+func Update(zkFramework core.ZKFramework, nodeName string, data []byte) (int32, error) {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Updating node at path:", actualPath)
 
@@ -130,7 +131,7 @@ func Update(zkFramework framework.ZKFramework, nodeName string, data []byte) (in
 /*
 Get gets a node at the given path.
 */
-func Get(zkFramework framework.ZKFramework, nodeName string) ([]byte, error) {
+func Get(zkFramework core.ZKFramework, nodeName string) ([]byte, error) {
 	// TODO with stats
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Getting node at path:", actualPath)
@@ -257,7 +258,7 @@ func existsNode(path string) connectionConsumer[bool] {
 	}
 }
 
-func execute[T any](zkFramework framework.ZKFramework, cnConsumer connectionConsumer[T]) (chan T, chan error) {
+func execute[T any](zkFramework core.ZKFramework, cnConsumer connectionConsumer[T]) (chan T, chan error) {
 
 	outChan := make(chan T)
 	errChan := make(chan error)

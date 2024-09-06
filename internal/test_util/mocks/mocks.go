@@ -5,6 +5,7 @@ package mocks
 
 import (
 	"github.com/go-zookeeper/zk"
+	"github.com/morphy76/zk/pkg/core"
 )
 
 /*
@@ -25,7 +26,7 @@ func (m *MockedStatusChangeListener) UUID() string {
 /*
 OnStatusChange is a mocked implementation of the OnStatusChange method.
 */
-func (m *MockedStatusChangeListener) OnStatusChange(previous zk.State, current zk.State) error {
+func (m *MockedStatusChangeListener) OnStatusChange(zkFramework core.ZKFramework, previous zk.State, current zk.State) error {
 	m.Interactions++
 	return nil
 }
@@ -48,7 +49,7 @@ func (m *MockedShutdownListener) UUID() string {
 /*
 OnShutdown is a mocked implementation of the OnShutdown method.
 */
-func (m *MockedShutdownListener) OnShutdown() error {
+func (m *MockedShutdownListener) OnShutdown(zkFramework core.ZKFramework) error {
 	m.Interactions++
 	return nil
 }
