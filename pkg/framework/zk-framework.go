@@ -140,11 +140,14 @@ func (c *zKFrameworkImpl) Stop() error {
 	defer c.cn.Close()
 
 	log.Printf("closing connection to Zookeeper server at %s", c.url)
-	c.started = false
 
 	c.stopBgTasks()
-	c.NotifyShutdown()
+	go func() {
+		c.NotifyShutdown()
+		c.clearAllListeners()
+	}()
 
+	c.started = false
 	c.state = zk.StateDisconnected
 
 	return nil
@@ -183,7 +186,6 @@ NotifyStatusChange notifies all listeners of a Zookeeper connection status chang
 */
 func (c *zKFrameworkImpl) NotifyStatusChange() {
 	// TODO locks
-
 	for _, listener := range c.statusChangeListeners {
 		if err := listener.OnStatusChange(c, c.previousState, c.state); err != nil {
 			log.Printf("error notifying status change listener: %s", err)
@@ -224,6 +226,18 @@ func (c *zKFrameworkImpl) NotifyShutdown() {
 			log.Printf("error notifying shutdown listener: %s", err)
 		}
 	}
+}
+
+func (c *zKFrameworkImpl) clearAllListeners() {
+	for _, listener := range c.statusChangeListeners {
+		listener.Stop()
+	}
+	c.statusChangeListeners = make(map[string]core.StatusChangeListener)
+
+	for _, listener := range c.shutdownListeners {
+		listener.Stop()
+	}
+	c.shutdownListeners = make(map[string]core.ShutdownListener)
 }
 
 func (c *zKFrameworkImpl) watchEvents() {
@@ -279,7 +293,7 @@ func (c *zKFrameworkImpl) handleStatusChange(state zk.State) {
 
 	c.previousState = c.state
 	c.state = state
-	c.NotifyStatusChange()
+	go c.NotifyStatusChange()
 	log.Printf("status change from %s to %s", c.previousState, c.state)
 
 	if !c.previouslyConnected() && isConnectedState(c.state) {

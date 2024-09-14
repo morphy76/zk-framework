@@ -32,6 +32,12 @@ func (m *MockedStatusChangeListener) OnStatusChange(zkFramework core.ZKFramework
 }
 
 /*
+Stop is a mocked implementation of the Stop method.
+*/
+func (m *MockedStatusChangeListener) Stop() {
+}
+
+/*
 MockedShutdownListener is a mocked implementation of the ShutdownListener interface.
 */
 type MockedShutdownListener struct {
@@ -52,4 +58,10 @@ OnShutdown is a mocked implementation of the OnShutdown method.
 func (m *MockedShutdownListener) OnShutdown(zkFramework core.ZKFramework) error {
 	m.Interactions++
 	return nil
+}
+
+/*
+Stop is a mocked implementation of the Stop method.
+*/
+func (m *MockedShutdownListener) Stop() {
 }

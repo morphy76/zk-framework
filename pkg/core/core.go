@@ -49,6 +49,7 @@ StatusChangeListener is an interface for listening to Zookeeper connection statu
 type StatusChangeListener interface {
 	UUID() string
 	OnStatusChange(zkFramework ZKFramework, previous zk.State, current zk.State) error
+	Stop()
 }
 
 /*
@@ -57,4 +58,5 @@ ShutdownListener is an interface for listening to Zookeeper client shutdown even
 type ShutdownListener interface {
 	UUID() string
 	OnShutdown(zkFramework ZKFramework) error
+	Stop()
 }

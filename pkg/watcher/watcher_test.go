@@ -77,13 +77,14 @@ func TestZKWatcher(t *testing.T) {
 		}
 
 		nodeData := []byte(uuid.New().String())
+		t.Logf("Update node %v with data %v", nodeName, string(nodeData))
 		operation.Update(zkFramework, nodeName, nodeData)
 
 		zkEvent := <-events
+		t.Logf("Received event %v", zkEvent)
 		if zkEvent.Type != zk.EventNodeDataChanged {
 			t.Errorf("expected %v, got %v", zk.EventNodeDataChanged, zkEvent.Type)
 		}
-		t.Logf("Received event %v", zkEvent)
 	})
 
 	t.Run("monitor a non-existent node", func(t *testing.T) {
