@@ -7,8 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	testutil "github.com/morphy76/zk/internal/test_util"
+	"github.com/morphy76/zk/internal/test_util/mocks"
+	"github.com/morphy76/zk/pkg/core/coreerr"
 	"github.com/morphy76/zk/pkg/framework"
-	testutil "github.com/morphy76/zk/pkg/test_util"
+	"github.com/morphy76/zk/pkg/framework/frwkerr"
 )
 
 const (
@@ -45,8 +48,8 @@ func TestZKFramework(t *testing.T) {
 	t.Run("Create a ZK framework with empty URL", func(t *testing.T) {
 		t.Log("Create a ZK framework with empty URL")
 		_, err := framework.CreateFramework("")
-		if !framework.IsInvalidConnectionURL(err) {
-			t.Errorf("expected error %v, got %v", framework.ErrInvalidConnectionURL, err)
+		if !frwkerr.IsInvalidConnectionURL(err) {
+			t.Errorf("expected error %v, got %v", frwkerr.ErrInvalidConnectionURL, err)
 		}
 	})
 
@@ -57,8 +60,8 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
-		if zkFramework.Url() != url {
-			t.Errorf("expected URL %s, got %s", url, zkFramework.Url())
+		if zkFramework.URL() != url {
+			t.Errorf("expected URL %s, got %s", url, zkFramework.URL())
 		}
 		if zkFramework.Connected() {
 			t.Error("expected client to be disconnected")
@@ -74,7 +77,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.Stop(); err != nil {
-			if !framework.IsFrameworkNotYetStarted(err) {
+			if !frwkerr.IsFrameworkNotYetStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -89,7 +92,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.WaitConnection(5 * time.Second); err != nil {
-			if !framework.IsFrameworkNotYetStarted(err) {
+			if !frwkerr.IsFrameworkNotYetStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -134,7 +137,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.Start(); err != nil {
-			if !framework.IsFrameworkAlreadyStarted(err) {
+			if !frwkerr.IsFrameworkAlreadyStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -164,7 +167,7 @@ func TestZKFramework(t *testing.T) {
 
 		err = zkFramework.WaitConnection(0 * time.Second)
 		if err != nil {
-			if !framework.IsConnectionTimeout(err) {
+			if !frwkerr.IsConnectionTimeout(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -195,6 +198,46 @@ func TestZKFramework(t *testing.T) {
 		if err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+	})
+
+	t.Run("Create and start-stop the framework twice", func(t *testing.T) {
+		t.Log("Create and start/stop the framework twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkFramework.Connected() {
+			t.Error(expectedClientToBeConnected)
+		}
+
+		if err := zkFramework.Stop(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.Start(); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		err = zkFramework.WaitConnection(10 * time.Second)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
 		if !zkFramework.Connected() {
 			t.Error(expectedClientToBeConnected)
 		}
@@ -255,6 +298,188 @@ func TestZKFramework(t *testing.T) {
 
 		if zkFramework.Namespace() != "/"+ns1+"/"+ns2+"/"+ns3 {
 			t.Errorf("expected /%s/%s/%s namespace, got %s", ns1, ns2, ns3, zkFramework.Namespace())
+		}
+	})
+
+	t.Run("Add a new status change listener", func(t *testing.T) {
+		t.Log("Add a new status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Add the same status change listener twice", func(t *testing.T) {
+		t.Log("Add the same status change listener twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			if !coreerr.IsListenerAlreadyExists(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Remove a status change listener", func(t *testing.T) {
+		t.Log("Remove a status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Remove a non-existent status change listener", func(t *testing.T) {
+		t.Log("Remove a non-existent status change listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
+			if !coreerr.IsListenerNotFound(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Test interaction when notifying status change listeners", func(t *testing.T) {
+		t.Log("Test interaction when notifying status change listeners")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedStatusChangeListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		zkFramework.NotifyStatusChange()
+		if mockedListener.Interactions != 1 {
+			t.Errorf("expected 1 interaction, got %d", mockedListener.Interactions)
+		}
+	})
+
+	t.Run("Add a new shutdown listener", func(t *testing.T) {
+		t.Log("Add a new shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Add the same shutdown listener twice", func(t *testing.T) {
+		t.Log("Add the same shutdown listener twice")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			if !coreerr.IsListenerAlreadyExists(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
+		}
+	})
+
+	t.Run("Remove a shutdown listener", func(t *testing.T) {
+		t.Log("Remove a shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+	})
+
+	t.Run("Remove a non-existent shutdown listener", func(t *testing.T) {
+		t.Log("Remove a non-existent shutdown listener")
+		url := os.Getenv(zkHostEnv)
+		zkFramework, err := framework.CreateFramework(url)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		mockedListener := &mocks.MockedShutdownListener{
+			ID:           uuid.New().String(),
+			Interactions: 0,
+		}
+		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
+			if !coreerr.IsListenerNotFound(err) {
+				t.Errorf(unexpectedErrorFmt, err)
+			}
 		}
 	})
 }

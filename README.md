@@ -1,10 +1,19 @@
 # Zookeeper framework for high level recipes
 
-The objective (actually a playground) is to bring Go into Cognitive to replace JVM simple components:
+High level recipes:
 
-- Push connector
-- Presentation servers
+- framework reconnection
+- simplified node operations
+- watchers
+- cache
+- locks
+- config set and encryption
+- group and leadership
 - ...
+
+### TODO
+
+- Consistent/pluggable logger
 
 ## module `framework`
 
@@ -16,6 +25,7 @@ More connection options, in particular:
 
 - Confidential connection using TLS
 - Authenticated connection
+- Create framework with context
 
 ## module `operation`
 
@@ -23,19 +33,8 @@ Baseline CRUD operations on nodes
 
 ### TODO
 
-- On creation: node types, data, ACL
 - On get/exists: stats
 
 ## module `watchers`
 
 Monitor and notify node changes
-
-## module `recipes`
-
-High level recipes:
-
-- cache
-- locks
-- config set and encryption
-- group and leadership
-- ...
