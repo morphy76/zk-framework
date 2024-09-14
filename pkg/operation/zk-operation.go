@@ -5,7 +5,6 @@ package operation
 
 import (
 	"context"
-	"errors"
 	"log"
 	"path"
 	"strings"
@@ -13,32 +12,9 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/core"
-	"github.com/morphy76/zk/pkg/framework"
+	"github.com/morphy76/zk/pkg/core/coreerr"
+	"github.com/morphy76/zk/pkg/framework/frwkerr"
 )
-
-/*
-ErrFrameworkNotReady is returned when the framework is not ready.
-*/
-var ErrFrameworkNotReady = errors.New("framework not ready")
-
-/*
-ErrUnknownNode is returned when the node is unknown.
-*/
-var ErrUnknownNode = errors.New("unknown node")
-
-/*
-IsFrameworkNotReady checks if the error is ErrFrameworkNotReady.
-*/
-func IsFrameworkNotReady(err error) bool {
-	return err == ErrFrameworkNotReady
-}
-
-/*
-IsUnknownNode checks if the error is ErrUnknownNode.
-*/
-func IsUnknownNode(err error) bool {
-	return err == ErrUnknownNode
-}
 
 type connectionConsumer[T any] func(*zk.Conn, chan T) error
 
@@ -180,7 +156,7 @@ func deleteNode(path string) connectionConsumer[bool] {
 		}
 
 		if !exists {
-			return ErrUnknownNode
+			return coreerr.ErrUnknownNode
 		}
 
 		err = cn.Delete(path, -1)
@@ -200,7 +176,7 @@ func updateNode(path string, data []byte) connectionConsumer[int32] {
 		}
 
 		if !exists {
-			return ErrUnknownNode
+			return coreerr.ErrUnknownNode
 		}
 
 		stat, err := cn.Set(path, data, -1)
@@ -264,7 +240,7 @@ func execute[T any](zkFramework core.ZKFramework, cnConsumer connectionConsumer[
 	errChan := make(chan error)
 
 	if !zkFramework.Started() {
-		errChan <- framework.ErrFrameworkNotYetStarted
+		errChan <- frwkerr.ErrFrameworkNotYetStarted
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

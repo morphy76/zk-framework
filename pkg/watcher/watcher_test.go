@@ -8,6 +8,7 @@ import (
 	"github.com/go-zookeeper/zk"
 	"github.com/google/uuid"
 	testutil "github.com/morphy76/zk/internal/test_util"
+	"github.com/morphy76/zk/pkg/core/coreerr"
 	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
 	"github.com/morphy76/zk/pkg/watcher"
@@ -108,8 +109,8 @@ func TestZKWatcher(t *testing.T) {
 
 		nodeName := uuid.New().String()
 		events := make(chan zk.Event)
-		if err := watcher.Set(zkFramework, nodeName, events, zk.EventNodeDataChanged); err != watcher.ErrUnknownNode {
-			t.Errorf("expected %v, got %v", watcher.ErrUnknownNode, err)
+		if err := watcher.Set(zkFramework, nodeName, events, zk.EventNodeDataChanged); err != coreerr.ErrUnknownNode {
+			t.Errorf("expected %v, got %v", coreerr.ErrUnknownNode, err)
 		}
 	})
 

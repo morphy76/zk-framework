@@ -4,7 +4,6 @@ Package watcher provides a way to watch for changes in Zookeeper nodes.
 package watcher
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"path"
@@ -13,19 +12,8 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/core"
+	"github.com/morphy76/zk/pkg/core/coreerr"
 )
-
-/*
-ErrUnknownNode is returned when the node is unknown.
-*/
-var ErrUnknownNode = errors.New("unknown node")
-
-/*
-IsUnknownNode checks if the error is ErrUnknownNode.
-*/
-func IsUnknownNode(err error) bool {
-	return err == ErrUnknownNode
-}
 
 type watchListener struct {
 	ID         string
@@ -73,7 +61,7 @@ func Set(zkFramework core.ZKFramework, nodeName string, outChan chan zk.Event, t
 	cn := zkFramework.Cn()
 	exists, _, out, err := cn.ExistsW(actualPath)
 	if !exists {
-		return ErrUnknownNode
+		return coreerr.ErrUnknownNode
 	}
 	if err != nil {
 		return err

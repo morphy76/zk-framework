@@ -9,8 +9,9 @@ import (
 	"github.com/google/uuid"
 	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/internal/test_util/mocks"
-	"github.com/morphy76/zk/pkg/core"
+	"github.com/morphy76/zk/pkg/core/coreerr"
 	"github.com/morphy76/zk/pkg/framework"
+	"github.com/morphy76/zk/pkg/framework/frwkerr"
 )
 
 const (
@@ -47,8 +48,8 @@ func TestZKFramework(t *testing.T) {
 	t.Run("Create a ZK framework with empty URL", func(t *testing.T) {
 		t.Log("Create a ZK framework with empty URL")
 		_, err := framework.CreateFramework("")
-		if !framework.IsInvalidConnectionURL(err) {
-			t.Errorf("expected error %v, got %v", framework.ErrInvalidConnectionURL, err)
+		if !frwkerr.IsInvalidConnectionURL(err) {
+			t.Errorf("expected error %v, got %v", frwkerr.ErrInvalidConnectionURL, err)
 		}
 	})
 
@@ -76,7 +77,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.Stop(); err != nil {
-			if !framework.IsFrameworkNotYetStarted(err) {
+			if !frwkerr.IsFrameworkNotYetStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -91,7 +92,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.WaitConnection(5 * time.Second); err != nil {
-			if !framework.IsFrameworkNotYetStarted(err) {
+			if !frwkerr.IsFrameworkNotYetStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -136,7 +137,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.Start(); err != nil {
-			if !framework.IsFrameworkAlreadyStarted(err) {
+			if !frwkerr.IsFrameworkAlreadyStarted(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -166,7 +167,7 @@ func TestZKFramework(t *testing.T) {
 
 		err = zkFramework.WaitConnection(0 * time.Second)
 		if err != nil {
-			if !framework.IsConnectionTimeout(err) {
+			if !frwkerr.IsConnectionTimeout(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -334,7 +335,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.AddStatusChangeListener(mockedListener); err != nil {
-			if !core.IsListenerAlreadyExists(err) {
+			if !coreerr.IsListenerAlreadyExists(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -374,7 +375,7 @@ func TestZKFramework(t *testing.T) {
 			Interactions: 0,
 		}
 		if err := zkFramework.RemoveStatusChangeListener(mockedListener); err != nil {
-			if !core.IsListenerNotFound(err) {
+			if !coreerr.IsListenerNotFound(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -436,7 +437,7 @@ func TestZKFramework(t *testing.T) {
 		}
 
 		if err := zkFramework.AddShutdownListener(mockedListener); err != nil {
-			if !core.IsListenerAlreadyExists(err) {
+			if !coreerr.IsListenerAlreadyExists(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}
@@ -476,7 +477,7 @@ func TestZKFramework(t *testing.T) {
 			Interactions: 0,
 		}
 		if err := zkFramework.RemoveShutdownListener(mockedListener); err != nil {
-			if !core.IsListenerNotFound(err) {
+			if !coreerr.IsListenerNotFound(err) {
 				t.Errorf(unexpectedErrorFmt, err)
 			}
 		}

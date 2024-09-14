@@ -4,7 +4,6 @@ Package framework provides a higher level Zookeeper client with more capabilitie
 package framework
 
 import (
-	"errors"
 	"log"
 	"path"
 	"strings"
@@ -14,55 +13,9 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/core"
+	"github.com/morphy76/zk/pkg/core/coreerr"
+	"github.com/morphy76/zk/pkg/framework/frwkerr"
 )
-
-/*
-ErrInvalidConnectionURL is returned when the connection URL is invalid. A connection url is invalid when it is empty.
-*/
-var ErrInvalidConnectionURL = errors.New("invalid connection URL")
-
-/*
-ErrConnectionTimeout is returned when the connection to the Zookeeper server times out.
-*/
-var ErrConnectionTimeout = errors.New("connection timeout")
-
-/*
-ErrFrameworkAlreadyStarted is returned when the Zookeeper client is already started.
-*/
-var ErrFrameworkAlreadyStarted = errors.New("framework already started")
-
-/*
-ErrFrameworkNotYetStarted is returned when the Zookeeper client is not yet started.
-*/
-var ErrFrameworkNotYetStarted = errors.New("framework not yet started")
-
-/*
-IsInvalidConnectionURL checks if the error is an invalid connection URL error.
-*/
-func IsInvalidConnectionURL(err error) bool {
-	return err == ErrInvalidConnectionURL
-}
-
-/*
-IsConnectionTimeout checks if the error is a connection timeout error.
-*/
-func IsConnectionTimeout(err error) bool {
-	return err == ErrConnectionTimeout
-}
-
-/*
-IsFrameworkAlreadyStarted checks if the error is an already started error.
-*/
-func IsFrameworkAlreadyStarted(err error) bool {
-	return err == ErrFrameworkAlreadyStarted
-}
-
-/*
-IsFrameworkNotYetStarted checks if the error is a not yet started error.
-*/
-func IsFrameworkNotYetStarted(err error) bool {
-	return err == ErrFrameworkNotYetStarted
-}
 
 const (
 	defaultReconnectionTimeoutMs = 100
@@ -125,7 +78,7 @@ Start connects to the Zookeeper server and starts watching connection events.
 */
 func (c *zKFrameworkImpl) Start() error {
 	if c.started {
-		return ErrFrameworkAlreadyStarted
+		return frwkerr.ErrFrameworkAlreadyStarted
 	}
 
 	log.Printf("connecting to Zookeeper server at %s", c.url)
@@ -140,7 +93,7 @@ WaitConnection waits for the connection to the Zookeeper server to be establishe
 */
 func (c *zKFrameworkImpl) WaitConnection(timeout time.Duration) error {
 	if !c.started {
-		return ErrFrameworkNotYetStarted
+		return frwkerr.ErrFrameworkNotYetStarted
 	}
 
 	if c.Connected() {
@@ -169,7 +122,7 @@ func (c *zKFrameworkImpl) WaitConnection(timeout time.Duration) error {
 		case <-c.shutdown:
 			return nil
 		case <-time.After(timeout):
-			return ErrConnectionTimeout
+			return frwkerr.ErrConnectionTimeout
 		}
 	}
 }
@@ -182,7 +135,7 @@ func (c *zKFrameworkImpl) Stop() error {
 	defer c.statusChangeLock.Unlock()
 
 	if !c.started {
-		return ErrFrameworkNotYetStarted
+		return frwkerr.ErrFrameworkNotYetStarted
 	}
 	defer c.cn.Close()
 
@@ -204,7 +157,7 @@ func (c *zKFrameworkImpl) AddStatusChangeListener(statusChangeListener core.Stat
 	// TODO locks
 
 	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found != nil {
-		return core.ErrListenerAlreadyExists
+		return coreerr.ErrListenerAlreadyExists
 	}
 
 	c.statusChangeListeners[statusChangeListener.UUID()] = statusChangeListener
@@ -218,7 +171,7 @@ func (c *zKFrameworkImpl) RemoveStatusChangeListener(statusChangeListener core.S
 	// TODO locks
 
 	if found := c.statusChangeListeners[statusChangeListener.UUID()]; found == nil {
-		return core.ErrListenerNotFound
+		return coreerr.ErrListenerNotFound
 	}
 
 	delete(c.statusChangeListeners, statusChangeListener.UUID())
@@ -243,7 +196,7 @@ AddShutdownListener adds a listener for Zookeeper client shutdown events.
 */
 func (c *zKFrameworkImpl) AddShutdownListener(shutdownListener core.ShutdownListener) error {
 	if found := c.shutdownListeners[shutdownListener.UUID()]; found != nil {
-		return core.ErrListenerAlreadyExists
+		return coreerr.ErrListenerAlreadyExists
 	}
 
 	c.shutdownListeners[shutdownListener.UUID()] = shutdownListener
@@ -255,7 +208,7 @@ RemoveShutdownListener removes a listener for Zookeeper client shutdown events.
 */
 func (c *zKFrameworkImpl) RemoveShutdownListener(shutdownListener core.ShutdownListener) error {
 	if found := c.shutdownListeners[shutdownListener.UUID()]; found == nil {
-		return core.ErrListenerNotFound
+		return coreerr.ErrListenerNotFound
 	}
 
 	delete(c.shutdownListeners, shutdownListener.UUID())
@@ -385,7 +338,7 @@ CreateFramework creates a new Zookeeper client with the given connection URL and
 */
 func CreateFramework(url string, namespace ...string) (core.ZKFramework, error) {
 	if url == "" {
-		return nil, ErrInvalidConnectionURL
+		return nil, frwkerr.ErrInvalidConnectionURL
 	}
 
 	useNamespace := "/" + strings.TrimPrefix(path.Join(namespace...), "/")

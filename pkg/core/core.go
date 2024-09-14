@@ -4,35 +4,10 @@ Package core provides the core interfaces for the Zookeeper framework.
 package core
 
 import (
-	"errors"
 	"time"
 
 	"github.com/go-zookeeper/zk"
 )
-
-/*
-ErrListenerAlreadyExists is returned when a listener is already added to the listener list.
-*/
-var ErrListenerAlreadyExists = errors.New("listener already exists")
-
-/*
-ErrListenerNotFound is returned when a listener is not found in the listener list.
-*/
-var ErrListenerNotFound = errors.New("listener not found")
-
-/*
-IsListenerAlreadyExists checks if the error is a listener already exists error.
-*/
-func IsListenerAlreadyExists(err error) bool {
-	return err == ErrListenerAlreadyExists
-}
-
-/*
-IsListenerNotFound checks if the error is a listener not found error.
-*/
-func IsListenerNotFound(err error) bool {
-	return err == ErrListenerNotFound
-}
 
 /*
 ZKFramework represents a Zookeeper client with higher level capabilities, wrapping github.com/go-zookeeper/zk.
