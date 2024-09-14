@@ -36,13 +36,30 @@ func Ls(zkFramework core.ZKFramework, paths ...string) ([]string, error) {
 }
 
 /*
+CreateWithOptions creates a node at the given path with the given options.
+*/
+func CreateWithOptions(zkFramework core.ZKFramework, nodeName string, options CreateOptions) error {
+	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
+	log.Println("Creating node at path:", actualPath)
+
+	outChan, errChan := execute(zkFramework, createNode(actualPath, &options))
+
+	select {
+	case <-outChan:
+		return nil
+	case err := <-errChan:
+		return err
+	}
+}
+
+/*
 Create creates a node at the given path.
 */
 func Create(zkFramework core.ZKFramework, nodeName string) error {
 	actualPath := path.Join(append([]string{zkFramework.Namespace()}, strings.Split(nodeName, "/")...)...)
 	log.Println("Creating node at path:", actualPath)
 
-	outChan, errChan := execute(zkFramework, createNode(actualPath))
+	outChan, errChan := execute(zkFramework, createNode(actualPath, nil))
 
 	path.Join()
 	select {
@@ -133,19 +150,41 @@ func listNodes(path string) connectionConsumer[[]string] {
 	}
 }
 
-func createNode(path string) connectionConsumer[bool] {
+func createNode(path string, options *CreateOptions) connectionConsumer[bool] {
 	return func(cn *zk.Conn, outChan chan bool) error {
-		// TODO node type
-		// TODO node data
-		// TODO node ACL
 		recursivelyGrantParent(path, cn)
-		_, err := cn.Create(path, []byte{}, 0, zk.WorldACL(zk.PermAll))
+		data, flag, acl := parseOptions(options)
+		_, err := cn.Create(path, data, flag, acl)
 		if err != nil {
 			return err
 		}
 		outChan <- true
 		return nil
 	}
+}
+
+func parseOptions(options *CreateOptions) ([]byte, int32, []zk.ACL) {
+	if options == nil {
+		return []byte{}, 0, zk.WorldACL(zk.PermAll)
+	}
+
+	data := options.Data
+	flag := options.Mode
+	acl := options.ACL
+
+	if data == nil {
+		data = []byte{}
+	}
+
+	if flag == 0 {
+		flag = 0
+	}
+
+	if acl == nil {
+		acl = zk.WorldACL(zk.PermAll)
+	}
+
+	return data, flag, acl
 }
 
 func deleteNode(path string) connectionConsumer[bool] {

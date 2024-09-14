@@ -23,7 +23,6 @@ Baseline CRUD operations on nodes
 
 ### TODO
 
-- On creation: node types, data, ACL
 - On get/exists: stats
 
 ## module `watchers`
