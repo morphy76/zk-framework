@@ -38,3 +38,12 @@ Baseline CRUD operations on nodes
 ## module `watchers`
 
 Monitor and notify node changes
+
+## module `cache`
+
+Cached access to node data
+
+### TODO
+
+- Initial implementation
+- Pluggable cache
