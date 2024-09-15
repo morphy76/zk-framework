@@ -47,6 +47,6 @@ Cached access to node data
 
 ### TODO
 
-- Initial implementation
+- Eviction and resource control
 - Pluggable cache
 - Better doc
