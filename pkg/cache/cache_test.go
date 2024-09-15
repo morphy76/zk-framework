@@ -8,6 +8,7 @@ import (
 	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/internal/test_util/mocks"
 	"github.com/morphy76/zk/pkg/cache"
+	"github.com/morphy76/zk/pkg/cache/cacheerr"
 	"github.com/morphy76/zk/pkg/operation"
 )
 
@@ -42,19 +43,34 @@ func TestMain(m *testing.M) {
 
 func TestZKCache(t *testing.T) {
 
-	t.Run("Create the cache", func(t *testing.T) {
-		t.Log("Create the cache")
+	t.Run("Create the cache with default options", func(t *testing.T) {
+		t.Log("Create the cache with default options")
 		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
 
-		zkCache, err := cache.NewCache(zkFramework)
+		_, err = cache.NewCache(zkFramework)
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
-		defer zkCache.Close()
+	})
+
+	t.Run("Create the cache with bad options, negative max cache size", func(t *testing.T) {
+		t.Log("Create the cache with bad options, negative max cache size")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		_, err = cache.NewCacheWithOptions(zkFramework, cache.ZKCacheOptions{MaxSizeInBytes: -1, EvictionPolicy: cache.EvictLeastRecentlyUsed})
+		if err == nil {
+			t.Fatalf("Expected error, got nil")
+		} else if !cacheerr.IsInvalidCacheSize(err) {
+			t.Fatalf("Expected invalid cache size error, got %v", err)
+		}
 	})
 
 	t.Run("Initial get data from the cache", func(t *testing.T) {
@@ -71,7 +87,6 @@ func TestZKCache(t *testing.T) {
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
-		defer zkCache.Close()
 
 		nodeName := uuid.New().String()
 		data := []byte(uuid.New().String())
@@ -119,7 +134,6 @@ func TestZKCache(t *testing.T) {
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
-		defer zkCache.Close()
 
 		nodeName := uuid.New().String()
 		data := []byte(uuid.New().String())
