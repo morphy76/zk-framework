@@ -1,13 +1,11 @@
 package operation_test
 
 import (
-	"os"
 	"testing"
-	"time"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/google/uuid"
-	"github.com/morphy76/zk/pkg/framework"
+	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/pkg/operation"
 )
 
@@ -57,24 +55,11 @@ func TestCreateOptionsBuilder(t *testing.T) {
 
 func TestCreateNodeWithOptions(t *testing.T) {
 	t.Log("Create node with options")
-	zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+	zkFramework, err := testutil.ConnectFramework()
 	if err != nil {
-		t.Errorf(unexpectedErrorFmt, err)
-	}
-
-	if err := zkFramework.Start(); err != nil {
 		t.Errorf(unexpectedErrorFmt, err)
 	}
 	defer zkFramework.Stop()
-
-	err = zkFramework.WaitConnection(10 * time.Second)
-	if err != nil {
-		t.Errorf(unexpectedErrorFmt, err)
-	}
-
-	if !zkFramework.Connected() {
-		t.Error(expectedClientToBeConnected)
-	}
 
 	nodeName := uuid.New().String()
 	acl := zk.WorldACL(zk.PermAll)

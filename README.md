@@ -26,6 +26,7 @@ More connection options, in particular:
 - Confidential connection using TLS
 - Authenticated connection
 - Create framework with context
+- Better doc
 
 ## module `operation`
 
@@ -34,6 +35,7 @@ Baseline CRUD operations on nodes
 ### TODO
 
 - On get/exists: stats
+- Better doc
 
 ## module `watchers`
 
@@ -47,3 +49,4 @@ Cached access to node data
 
 - Initial implementation
 - Pluggable cache
+- Better doc

@@ -4,11 +4,9 @@ import (
 	"os"
 	"path"
 	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	testutil "github.com/morphy76/zk/internal/test_util"
-	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
 )
 
@@ -45,24 +43,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("List nodes", func(t *testing.T) {
 		t.Log("List nodes")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodes, err := operation.Ls(zkFramework, "/")
 		if err != nil {
@@ -79,24 +64,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Create node", func(t *testing.T) {
 		t.Log("Create node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 
@@ -107,24 +79,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Create a duplicated node", func(t *testing.T) {
 		t.Log("Create node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 
@@ -139,24 +98,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Exists node", func(t *testing.T) {
 		t.Log("Exists node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		if err := operation.Create(zkFramework, nodeName); err != nil {
@@ -174,24 +120,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Delete node", func(t *testing.T) {
 		t.Log("Delete node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		if err := operation.Create(zkFramework, nodeName); err != nil {
@@ -205,24 +138,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Delete non-existent node", func(t *testing.T) {
 		t.Log("Delete non-existent node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		if err := operation.Delete(zkFramework, nodeName); err == nil {
@@ -232,24 +152,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Update node", func(t *testing.T) {
 		t.Log("Update node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		if err := operation.Create(zkFramework, nodeName); err != nil {
@@ -277,24 +184,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Update non-existent node", func(t *testing.T) {
 		t.Log("Update non-existent node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		data := []byte(uuid.New().String())
@@ -306,24 +200,11 @@ func TestZKOperation(t *testing.T) {
 
 	t.Run("Get non-existent node", func(t *testing.T) {
 		t.Log("Get non-existent node")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := path.Join(uuid.New().String(), uuid.New().String())
 		_, err = operation.Get(zkFramework, nodeName)
