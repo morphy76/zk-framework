@@ -3,6 +3,7 @@ package cache_test
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	testutil "github.com/morphy76/zk/internal/test_util"
@@ -51,10 +52,11 @@ func TestZKCache(t *testing.T) {
 		}
 		defer zkFramework.Stop()
 
-		_, err = cache.NewCache(zkFramework)
+		zkCache, err := cache.NewCache(zkFramework)
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
+		defer zkCache.Clear()
 	})
 
 	t.Run("Create the cache with bad options, negative max cache size", func(t *testing.T) {
@@ -65,7 +67,13 @@ func TestZKCache(t *testing.T) {
 		}
 		defer zkFramework.Stop()
 
-		_, err = cache.NewCacheWithOptions(zkFramework, cache.ZKCacheOptions{MaxSizeInBytes: -1, EvictionPolicy: cache.EvictLeastRecentlyUsed})
+		optsBuilder, err := cache.NewCacheOptionsBuilder()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		opts := optsBuilder.WithMaxSizeInBytes(-1).Build()
+
+		_, err = cache.NewCacheWithOptions(zkFramework, opts)
 		if err == nil {
 			t.Fatalf("Expected error, got nil")
 		} else if !cacheerr.IsInvalidCacheSize(err) {
@@ -87,6 +95,7 @@ func TestZKCache(t *testing.T) {
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
+		defer zkCache.Clear()
 
 		nodeName := uuid.New().String()
 		data := []byte(uuid.New().String())
@@ -111,7 +120,7 @@ func TestZKCache(t *testing.T) {
 			t.Errorf("Expected data to be %v, got %v", data, cachedData)
 		}
 
-		if spiedFramework.Interactions["Cn"] != 1 {
+		if spiedFramework.Interactions["Cn"] != 2 {
 			t.Errorf("Expected Cn to be called once but was called %v times", spiedFramework.Interactions["Cn"])
 		}
 
@@ -134,6 +143,7 @@ func TestZKCache(t *testing.T) {
 		if err != nil {
 			t.Fatalf(unexpectedErrorFmt, err)
 		}
+		defer zkCache.Clear()
 
 		nodeName := uuid.New().String()
 		data := []byte(uuid.New().String())
@@ -166,12 +176,132 @@ func TestZKCache(t *testing.T) {
 			t.Errorf("Expected data to be %v, got %v", data, cachedData)
 		}
 
-		if spiedFramework.Interactions["Cn"] != 1 {
+		if spiedFramework.Interactions["Cn"] != 2 {
 			t.Errorf("Expected Cn to be called once but was called %v times", spiedFramework.Interactions["Cn"])
 		}
 
 		if zkCache.GetSizeInBytes() != len(data) {
 			t.Errorf("Expected cache size to be %v, got %v", len(data), zkCache.GetSizeInBytes())
+		}
+	})
+
+	t.Run("Get data from a synched cache", func(t *testing.T) {
+		t.Log("Get data from a synched cache")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		spiedFramework := mocks.NewSpiedFramework(zkFramework)
+
+		zkCache, err := cache.NewCache(spiedFramework)
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkCache.Clear()
+
+		nodeName := uuid.New().String()
+		data := []byte(uuid.New().String())
+
+		opts := operation.NewCreateOptionsBuilder().
+			WithData(data).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		cachedData, err := zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if string(cachedData) != string(data) {
+			t.Errorf("Expected data to be %v, got %v", data, cachedData)
+		}
+
+		newData := []byte(uuid.New().String())
+		operation.Update(zkFramework, nodeName, newData)
+		<-time.After(1 * time.Second)
+
+		cachedData, err = zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if string(cachedData) == string(data) {
+			t.Errorf("Expected data to be updated")
+		}
+
+		if string(cachedData) != string(newData) {
+			t.Errorf("Expected data to be %v, got %v", string(cachedData), string(newData))
+		}
+	})
+
+	t.Run("Get data from a non-synched cache", func(t *testing.T) {
+		t.Log("Get data from a non-synched cache")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		spiedFramework := mocks.NewSpiedFramework(zkFramework)
+
+		optsBuilder, err := cache.NewCacheOptionsBuilder()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		cacheOpts := optsBuilder.WithEnableCacheSynch(false).Build()
+
+		zkCache, err := cache.NewCacheWithOptions(spiedFramework, cacheOpts)
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkCache.Clear()
+
+		nodeName := uuid.New().String()
+		data := []byte(uuid.New().String())
+
+		opts := operation.NewCreateOptionsBuilder().
+			WithData(data).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		cachedData, err := zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if string(cachedData) != string(data) {
+			t.Errorf("Expected data to be %v, got %v", data, cachedData)
+		}
+
+		newData := []byte(uuid.New().String())
+		operation.Update(zkFramework, nodeName, newData)
+		<-time.After(1 * time.Second)
+
+		cachedData, err = zkCache.Get(nodeName)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if string(cachedData) != string(data) {
+			t.Errorf("Expected data to be not updated because it is not in sync")
 		}
 	})
 }

@@ -41,6 +41,10 @@ Baseline CRUD operations on nodes
 
 Monitor and notify node changes
 
+### TODO
+
+- verify locks and leaks in watchers
+
 ## module `cache`
 
 Cached access to node data

@@ -15,49 +15,49 @@ type CreateOptions struct {
 CreateOptionsBuilder is a builder for createOptions.
 */
 type CreateOptionsBuilder struct {
-	options CreateOptions
+	acl  []zk.ACL
+	data []byte
+	mode int32
 }
 
 /*
 NewCreateOptionsBuilder creates a new CreateOptionsBuilder.
 */
-func NewCreateOptionsBuilder() *CreateOptionsBuilder {
-	return &CreateOptionsBuilder{
-		options: CreateOptions{
-			ACL:  nil,
-			Data: nil,
-			Mode: 0,
-		},
-	}
+func NewCreateOptionsBuilder() CreateOptionsBuilder {
+	return CreateOptionsBuilder{}
 }
 
 /*
 WithACL sets the ACL for the create operation.
 */
-func (cob *CreateOptionsBuilder) WithACL(acl []zk.ACL) *CreateOptionsBuilder {
-	cob.options.ACL = acl
+func (cob CreateOptionsBuilder) WithACL(acl []zk.ACL) CreateOptionsBuilder {
+	cob.acl = acl
 	return cob
 }
 
 /*
 WithData sets the data for the create operation.
 */
-func (cob *CreateOptionsBuilder) WithData(data []byte) *CreateOptionsBuilder {
-	cob.options.Data = data
+func (cob CreateOptionsBuilder) WithData(data []byte) CreateOptionsBuilder {
+	cob.data = data
 	return cob
 }
 
 /*
 WithMode sets the mode for the create operation.
 */
-func (cob *CreateOptionsBuilder) WithMode(mode int32) *CreateOptionsBuilder {
-	cob.options.Mode = mode
+func (cob CreateOptionsBuilder) WithMode(mode int32) CreateOptionsBuilder {
+	cob.mode = mode
 	return cob
 }
 
 /*
 Build builds the CreateOptions.
 */
-func (cob *CreateOptionsBuilder) Build() CreateOptions {
-	return cob.options
+func (cob CreateOptionsBuilder) Build() CreateOptions {
+	return CreateOptions{
+		ACL:  cob.acl,
+		Data: cob.data,
+		Mode: cob.mode,
+	}
 }
