@@ -53,6 +53,7 @@ func (w *watchListener) OnStatusChange(zkFramework core.ZKFramework, previous zk
 			w.Start(zkFramework)
 			w.disconnected = false
 		}
+
 	}
 	return nil
 }

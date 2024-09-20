@@ -3,13 +3,11 @@ package watcher_test
 import (
 	"os"
 	"testing"
-	"time"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/google/uuid"
 	testutil "github.com/morphy76/zk/internal/test_util"
 	"github.com/morphy76/zk/pkg/core/coreerr"
-	"github.com/morphy76/zk/pkg/framework"
 	"github.com/morphy76/zk/pkg/operation"
 	"github.com/morphy76/zk/pkg/watcher"
 )
@@ -47,24 +45,11 @@ func TestZKWatcher(t *testing.T) {
 
 	t.Run("Monitor and notify node changes", func(t *testing.T) {
 		t.Log("Set a watcher")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 		if err := operation.Create(zkFramework, nodeName); err != nil {
@@ -89,24 +74,11 @@ func TestZKWatcher(t *testing.T) {
 
 	t.Run("monitor a non-existent node", func(t *testing.T) {
 		t.Log("Set a watcher")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 		events := make(chan zk.Event)
@@ -117,24 +89,11 @@ func TestZKWatcher(t *testing.T) {
 
 	t.Run("monitor the same node, twice", func(t *testing.T) {
 		t.Log("Set a watcher twice")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 		if err := operation.Create(zkFramework, nodeName); err != nil {
@@ -153,24 +112,11 @@ func TestZKWatcher(t *testing.T) {
 
 	t.Run("monitor the same node, different events", func(t *testing.T) {
 		t.Log("Set a watcher twice for different events")
-		zkFramework, err := framework.CreateFramework(os.Getenv(zkHostEnv))
+		zkFramework, err := testutil.ConnectFramework()
 		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if err := zkFramework.Start(); err != nil {
 			t.Errorf(unexpectedErrorFmt, err)
 		}
 		defer zkFramework.Stop()
-
-		err = zkFramework.WaitConnection(10 * time.Second)
-		if err != nil {
-			t.Errorf(unexpectedErrorFmt, err)
-		}
-
-		if !zkFramework.Connected() {
-			t.Error(expectedClientToBeConnected)
-		}
 
 		nodeName := uuid.New().String()
 		if err := operation.Create(zkFramework, nodeName); err != nil {
