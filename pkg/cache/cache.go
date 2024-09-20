@@ -5,11 +5,10 @@ package cache
 
 import (
 	"log"
-	"os"
+	"math"
 	"path"
-	"strconv"
 	"sync"
-	"syscall"
+	"time"
 
 	"github.com/go-zookeeper/zk"
 	"github.com/morphy76/zk/pkg/cache/cacheerr"
@@ -38,103 +37,13 @@ Cache is a simple in-memory cache implementation.
 type Cache struct {
 	framework      core.ZKFramework
 	cache          map[string][]byte
+	cacheUsage     map[string]int64
 	sizeInBytes    int
 	evictionPolicy EvictionPolicy
 	maxSizeInBytes int
 	evictPathCh    chan string
 	mu             sync.RWMutex
 	synched        bool
-}
-
-/*
-ZKCacheOptions is used to configure the cache.
-*/
-type ZKCacheOptions struct {
-	// MaxSizeInBytes is the maximum size of the cache in bytes.
-	MaxSizeInBytes int
-	// EvictionPolicy is the policy used to evict nodes from the cache.
-	EvictionPolicy EvictionPolicy
-	// EnableCacheSynch is a flag to enable cache synchronization with the ZooKeeper server on node data change.
-	EnableCacheSynch bool
-}
-
-/*
-ZKCacheOptionsBuilder is a builder for ZKCacheOptions.
-*/
-type ZKCacheOptionsBuilder struct {
-	maxSizeInBytes   int
-	evictionPolicy   EvictionPolicy
-	enableCacheSynch bool
-}
-
-const (
-	defaultCacheMemoryPercentage = 5
-)
-
-/*
-NewCacheOptionsBuilder creates a new ZKCacheOptionsBuilder.
-*/
-func NewCacheOptionsBuilder() (ZKCacheOptionsBuilder, error) {
-	var sysinfo syscall.Sysinfo_t
-	err := syscall.Sysinfo(&sysinfo)
-	if err != nil {
-		return ZKCacheOptionsBuilder{}, err
-	}
-	availableMemory := sysinfo.Totalram * uint64(sysinfo.Unit)
-
-	pctg, ok := os.LookupEnv("ZK_CACHE_MAX_SIZE_PCTG")
-	useCachePctg := defaultCacheMemoryPercentage
-
-	if ok {
-		parsedPctg, err := strconv.Atoi(pctg)
-		if err == nil && parsedPctg >= 0 && parsedPctg <= 100 {
-			useCachePctg = parsedPctg
-		} else {
-			log.Printf("Invalid value for ZK_CACHE_MAX_SIZE_PCTG: %s. Using default value of %d", pctg, useCachePctg)
-		}
-	}
-	maxSizeInBytes := int(availableMemory * uint64(useCachePctg) / 100)
-
-	return ZKCacheOptionsBuilder{
-		maxSizeInBytes:   maxSizeInBytes,
-		evictionPolicy:   EvictLeastRecentlyUsed,
-		enableCacheSynch: true,
-	}, nil
-}
-
-/*
-WithMaxSizeInBytes sets the maximum size of the cache in bytes.
-*/
-func (b ZKCacheOptionsBuilder) WithMaxSizeInBytes(maxSizeInBytes int) ZKCacheOptionsBuilder {
-	b.maxSizeInBytes = maxSizeInBytes
-	return b
-}
-
-/*
-WithEvictionPolicy sets the eviction policy for the cache.
-*/
-func (b ZKCacheOptionsBuilder) WithEvictionPolicy(evictionPolicy EvictionPolicy) ZKCacheOptionsBuilder {
-	b.evictionPolicy = evictionPolicy
-	return b
-}
-
-/*
-WithEnableCacheSynch sets the flag to enable cache synchronization with the ZooKeeper server on node data change.
-*/
-func (b ZKCacheOptionsBuilder) WithEnableCacheSynch(enableCacheSynch bool) ZKCacheOptionsBuilder {
-	b.enableCacheSynch = enableCacheSynch
-	return b
-}
-
-/*
-Build builds the ZKCacheOptions.
-*/
-func (b ZKCacheOptionsBuilder) Build() ZKCacheOptions {
-	return ZKCacheOptions{
-		MaxSizeInBytes:   b.maxSizeInBytes,
-		EvictionPolicy:   b.evictionPolicy,
-		EnableCacheSynch: b.enableCacheSynch,
-	}
 }
 
 /*
@@ -162,6 +71,7 @@ func NewCacheWithOptions(framework core.ZKFramework, options ZKCacheOptions) (*C
 	return &Cache{
 		framework:      framework,
 		cache:          make(map[string][]byte),
+		cacheUsage:     make(map[string]int64),
 		sizeInBytes:    0,
 		evictionPolicy: options.EvictionPolicy,
 		maxSizeInBytes: options.MaxSizeInBytes,
@@ -187,6 +97,19 @@ func (c *Cache) Clear() {
 /*
 Get gets a node at the given path.
 */
+func (c *Cache) IsCached(nodeName string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	actualPath := path.Join(append([]string{c.framework.Namespace()}, nodeName)...)
+
+	_, ok := c.cache[actualPath]
+	return ok
+}
+
+/*
+Get gets a node at the given path.
+*/
 func (c *Cache) Get(nodeName string) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -195,7 +118,15 @@ func (c *Cache) Get(nodeName string) ([]byte, error) {
 
 	cachedData, ok := c.cache[actualPath]
 	if ok {
+		c.incrementUsageByPolicy(actualPath)
 		return cachedData, nil
+	}
+
+	if c.testExceedingResources() {
+		err := c.evictByPolicy()
+		if err != nil {
+			log.Printf("Error evicting cache: %v, warning, possible leak", err)
+		}
 	}
 
 	data, err := operation.Get(c.framework, actualPath)
@@ -203,6 +134,7 @@ func (c *Cache) Get(nodeName string) ([]byte, error) {
 		return nil, err
 	}
 	c.cache[actualPath] = data
+	c.initCacheUsageByPolicy(actualPath)
 	c.refreshSizeInBytes()
 
 	if !c.synched {
@@ -252,6 +184,7 @@ func (c *Cache) evict(zkPath string) {
 		c.evictPathCh <- zkPath
 	}
 	delete(c.cache, zkPath)
+	delete(c.cacheUsage, zkPath)
 }
 
 func (c *Cache) renew(actualPath string) error {
@@ -266,5 +199,80 @@ func (c *Cache) renew(actualPath string) error {
 	c.cache[actualPath] = data
 	c.refreshSizeInBytes()
 
+	return nil
+}
+
+func (c *Cache) testExceedingResources() bool {
+	log.Printf("Cache size: %d, max size: %d", c.sizeInBytes, c.maxSizeInBytes)
+	return c.sizeInBytes > c.maxSizeInBytes
+}
+
+func (c *Cache) evictByPolicy() error {
+	switch c.evictionPolicy {
+	case EvictLeastRecentlyUsed:
+		return c.evictLRU()
+	case EvictLeastFrequentlyUsed:
+		return c.evictLFU()
+	case EvictRandomly:
+		return c.evictRandomly()
+	default:
+		return cacheerr.ErrInvalidEvictionPolicy
+	}
+}
+
+func (c *Cache) initCacheUsageByPolicy(zkPath string) {
+	if c.evictionPolicy == EvictLeastFrequentlyUsed {
+		c.cacheUsage[zkPath] = 1
+	} else if c.evictionPolicy == EvictLeastRecentlyUsed {
+		c.cacheUsage[zkPath] = time.Now().UnixNano()
+	}
+}
+
+func (c *Cache) incrementUsageByPolicy(zkPath string) {
+	if c.evictionPolicy == EvictLeastFrequentlyUsed {
+		c.cacheUsage[zkPath]++
+	} else if c.evictionPolicy == EvictLeastRecentlyUsed {
+		c.cacheUsage[zkPath] = time.Now().UnixNano()
+	}
+}
+
+func (c *Cache) evictLRU() error {
+	oldestPath := ""
+	oldestTime := time.Now().UnixNano()
+	for zkPath, time := range c.cacheUsage {
+		if time < oldestTime {
+			oldestTime = time
+			oldestPath = zkPath
+		}
+	}
+	log.Printf("Evicting LRU: %s", oldestPath)
+	if oldestPath != "" {
+		c.evict(oldestPath)
+	}
+	return nil
+}
+
+func (c *Cache) evictLFU() error {
+	leastFrequentPath := ""
+	var leastFrequency int64 = math.MaxInt64
+	for zkPath, frequency := range c.cacheUsage {
+		if frequency < leastFrequency {
+			leastFrequency = frequency
+			leastFrequentPath = zkPath
+		}
+	}
+	log.Printf("Evicting LFU: %s", leastFrequentPath)
+	if leastFrequentPath != "" {
+		c.evict(leastFrequentPath)
+	}
+	return nil
+}
+
+func (c *Cache) evictRandomly() error {
+	log.Printf("Evicting randomly")
+	for zkPath := range c.cache {
+		c.evict(zkPath)
+		break
+	}
 	return nil
 }

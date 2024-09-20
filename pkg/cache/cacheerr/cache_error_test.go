@@ -20,3 +20,17 @@ func TestIsErrInvalidCacheSizeFalse(t *testing.T) {
 		t.Errorf("expected false, got true")
 	}
 }
+
+func TestIsErrInvalidEvictionPolicy(t *testing.T) {
+	err := cacheerr.ErrInvalidEvictionPolicy
+	if !cacheerr.IsInvalidEvictionPolicy(err) {
+		t.Errorf("expected true, got false")
+	}
+}
+
+func TestIsErrInvalidEvictionPolicyFalse(t *testing.T) {
+	err := errors.New("some error")
+	if cacheerr.IsInvalidEvictionPolicy(err) {
+		t.Errorf("expected false, got true")
+	}
+}

@@ -304,4 +304,265 @@ func TestZKCache(t *testing.T) {
 			t.Errorf("Expected data to be not updated because it is not in sync")
 		}
 	})
+
+	t.Run("Evict randomly from a cache", func(t *testing.T) {
+		t.Log("Evict randomly from a cache")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		builder, err := cache.NewCacheOptionsBuilder()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		cacheOpts := builder.
+			WithEnableCacheSynch(false).
+			WithEvictionPolicy(cache.EvictRandomly).
+			WithMaxSizeInBytes(1).
+			Build()
+
+		zkCache, err := cache.NewCacheWithOptions(zkFramework, cacheOpts)
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkCache.Clear()
+
+		nodeName1 := uuid.New().String()
+		data1 := []byte(uuid.New().String())
+
+		opts := operation.NewCreateOptionsBuilder().
+			WithData(data1).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName1, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		nodeName2 := uuid.New().String()
+		data2 := []byte(uuid.New().String())
+
+		opts = operation.NewCreateOptionsBuilder().
+			WithData(data2).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName2, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if zkCache.GetSizeInBytes() != (len(data1)+len(data2))/2 {
+			t.Errorf("Expected cache size to be %v, got %v", len(data1)+len(data2), zkCache.GetSizeInBytes())
+		}
+	})
+
+	t.Run("Evict the least frequently used from a cache", func(t *testing.T) {
+		t.Log("Evict the least frequently used from a cache")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		nodeName1 := uuid.New().String()
+		data1 := []byte(uuid.New().String())
+
+		nodeName2 := uuid.New().String()
+		data2 := []byte(uuid.New().String())
+
+		builder, err := cache.NewCacheOptionsBuilder()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		cacheOpts := builder.
+			WithEnableCacheSynch(false).
+			WithEvictionPolicy(cache.EvictLeastFrequentlyUsed).
+			WithMaxSizeInBytes(len(data1) + len(data2) - 1).
+			Build()
+
+		zkCache, err := cache.NewCacheWithOptions(zkFramework, cacheOpts)
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkCache.Clear()
+
+		opts := operation.NewCreateOptionsBuilder().
+			WithData(data1).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName1, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		opts = operation.NewCreateOptionsBuilder().
+			WithData(data2).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName2, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		nodeName3 := uuid.New().String()
+		data3 := []byte(uuid.New().String())
+
+		opts = operation.NewCreateOptionsBuilder().
+			WithData(data3).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName3, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName3)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkCache.IsCached(nodeName1) {
+			t.Errorf("Expected %v to be cached", nodeName1)
+		}
+
+		if zkCache.IsCached(nodeName2) {
+			t.Errorf("Expected %v to be evicted", nodeName2)
+		}
+
+		if !zkCache.IsCached(nodeName3) {
+			t.Errorf("Expected %v to be cached", nodeName3)
+		}
+	})
+
+	t.Run("Evict the least recently used from a cache", func(t *testing.T) {
+		t.Log("Evict the least recently used from a cache")
+		zkFramework, err := testutil.ConnectFramework()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkFramework.Stop()
+
+		nodeName1 := uuid.New().String()
+		data1 := []byte(uuid.New().String())
+
+		nodeName2 := uuid.New().String()
+		data2 := []byte(uuid.New().String())
+
+		builder, err := cache.NewCacheOptionsBuilder()
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		cacheOpts := builder.
+			WithEnableCacheSynch(false).
+			WithEvictionPolicy(cache.EvictLeastRecentlyUsed).
+			WithMaxSizeInBytes(len(data1) + len(data2) - 1).
+			Build()
+
+		zkCache, err := cache.NewCacheWithOptions(zkFramework, cacheOpts)
+		if err != nil {
+			t.Fatalf(unexpectedErrorFmt, err)
+		}
+		defer zkCache.Clear()
+
+		opts := operation.NewCreateOptionsBuilder().
+			WithData(data1).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName1, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		opts = operation.NewCreateOptionsBuilder().
+			WithData(data2).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName2, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		nodeName3 := uuid.New().String()
+		data3 := []byte(uuid.New().String())
+
+		opts = operation.NewCreateOptionsBuilder().
+			WithData(data3).
+			Build()
+
+		if err := operation.CreateWithOptions(zkFramework, nodeName3, opts); err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName2)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName1)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		_, err = zkCache.Get(nodeName3)
+		if err != nil {
+			t.Errorf(unexpectedErrorFmt, err)
+		}
+
+		if !zkCache.IsCached(nodeName1) {
+			t.Errorf("Expected %v to be cached", nodeName1)
+		}
+
+		if zkCache.IsCached(nodeName2) {
+			t.Errorf("Expected %v to be evicted", nodeName2)
+		}
+
+		if !zkCache.IsCached(nodeName3) {
+			t.Errorf("Expected %v to be cached", nodeName3)
+		}
+	})
 }
