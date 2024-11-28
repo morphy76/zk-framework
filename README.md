@@ -49,3 +49,12 @@ Cached access to node data
 
 - Pluggable cache
 - Better doc
+
+## module `locks`
+
+Locks and barriers
+
+### TODO
+
+- Reentrant (?)
+- Better doc
