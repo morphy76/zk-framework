@@ -275,4 +275,5 @@ func (c *Cache) evictRandomly() error {
 		break
 	}
 	return nil
+
 }
